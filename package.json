@@ -1,0 +1,17 @@
+{
+  "name": "cash-flow-app",
+  "version": "1.0.0",
+  "description": "Personal Cash Flow Manager Mobile App",
+  "main": "index.js",
+  "scripts": {
+    "build": "echo 'No build step required for plain HTML/JS'",
+    "sync": "cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/core": "^6.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.1"
+  }
+}

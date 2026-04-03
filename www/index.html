@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Cash Flow Manager</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  [v-cloak] { display: none; }
+  input:invalid { border-color: red; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+<!-- Login Screen -->
+<div id="login-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-slate-100 overflow-y-auto p-4">
+  <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full border border-slate-200">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-lg mb-4 text-3xl font-black italic">CF</div>
+      <h2 class="text-3xl font-black text-slate-800 tracking-tight">Welcome Back</h2>
+      <p class="text-slate-500 text-sm mt-1">Select a profile or create a new one</p>
+    </div>
+
+    <div id="profile-selection-area" class="mb-8 hidden">
+      <div class="flex justify-between items-center mb-3 px-1">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Saved Profiles</h3>
+        <button onclick="clearAllProfiles()" class="text-[10px] text-red-500 hover:text-red-700 font-bold uppercase transition-colors">Clear All</button>
+      </div>
+      <div id="profile-list" class="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1"></div>
+    </div>
+
+    <div class="relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-slate-200" id="login-separator"></div>
+      </div>
+      <div class="relative flex justify-center text-xs uppercase" id="login-separator-text">
+        <span class="bg-white px-2 text-slate-400 font-medium">New Profile</span>
+      </div>
+    </div>
+
+    <div class="mt-6 space-y-4">
+      <input type="text" id="username" class="border border-slate-300 w-full p-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="Enter name...">
+      <button onclick="login()" class="bg-blue-600 hover:bg-blue-500 text-white w-full p-3 rounded-xl font-bold shadow-lg transition-all active:scale-95 shadow-blue-200">Login / Create Profile</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app-screen" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+  <!-- Header -->
+  <header class="bg-blue-800 text-white p-3 flex flex-wrap justify-between items-center z-10 sticky top-0 shadow shrink-0 gap-2">
+    <div class="flex items-center gap-2">
+      <button onclick="document.getElementById('sidebar').classList.toggle('hidden');" class="md:hidden px-2 border rounded">☰</button>
+      <h1 class="text-lg font-bold">Cash Flow Manager</h1>
+    </div>
+    <div class="flex items-center gap-3 text-xs md:text-sm flex-wrap">
+      <label>Display: <select id="disp-curr" class="text-black p-1 rounded" onchange="updateDispCurr()"><option value="EGP">EGP</option><option value="USD">USD</option><option value="AED">AED</option></select></label>
+      <button onclick="document.getElementById('rate-modal').classList.remove('hidden')" class="underline hover:text-blue-200">Rates</button>
+      <div class="border-l border-blue-500 h-6"></div>
+      <label>Scenario: <select id="scenario-select" class="text-black p-1 rounded w-32" onchange="switchScenario()"></select></label>
+      <div class="flex gap-1">
+        <button onclick="newScenario()" class="bg-green-500 hover:bg-green-400 px-2 py-1 rounded" title="New Scenario">+</button>
+        <button onclick="copyScenario()" class="bg-blue-500 hover:bg-blue-400 px-2 py-1 rounded" title="Duplicate Scenario">Copy</button>
+        <button onclick="delScenario()" class="bg-red-500 hover:bg-red-400 px-2 py-1 rounded" title="Delete Scenario">X</button>
+      </div>
+      <div class="border-l border-blue-500 h-6"></div>
+      <label>View: <select id="time-view" class="text-black p-1 rounded" onchange="render()"><option value="120">10 Y</option><option value="60">5 Y</option><option value="12">1 Y</option></select></label>
+      <div class="border-l border-blue-500 h-6"></div>
+      <span class="font-bold hidden md:inline" id="user-display"></span>
+      <button onclick="logout()" class="underline hover:text-red-300">Logout</button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-full md:w-80 bg-white p-4 overflow-y-auto border-r shrink-0 hidden md:block text-sm" oninput="saveInputs()">
+      <h2 class="font-bold mb-3 text-lg">Assumptions</h2>
+      
+      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-blue-50 text-blue-900 border border-blue-200 p-2 rounded">Current Assets (EGP)</summary>
+        <div class="p-2 space-y-2">
+          <div><label class="block text-xs font-semibold">Initial Cash / Savings</label><input data-model="initialCash" type="number" min="0" class="border border-blue-300 w-full p-2 rounded bg-white"></div>
+        </div>
+      </details>
+
+      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Apartment Details</summary>
+        <div class="p-2 space-y-2">
+          <div><label class="block text-xs font-semibold">Purchase Date</label><input data-model="purchaseDate" type="month" class="border border-blue-300 w-full p-2 rounded bg-white"></div>
+          <div><label class="block text-xs">Price (EGP)</label><input data-model="purchasePrice" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Down Payment %</label><input data-model="downPaymentPct" type="number" min="0" max="100" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Loan Term (Years)</label><input data-model="loanTermYears" type="number" min="1" class="border w-full p-1 rounded"></div>
+        </div>
+      </details>
+
+      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Income (EGP)</summary>
+        <div class="p-2 space-y-2">
+          <div><label class="block text-xs">Monthly Salary</label><input data-model="salary" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Salary Growth %/yr</label><input data-model="salaryGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Annual Bonus (Mar from Y2)</label><input data-model="bonus" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Bonus Growth %/yr</label><input data-model="bonusGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Other Income (Monthly)</label><input data-model="otherIncome" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Other Income Growth %/yr</label><input data-model="otherIncomeGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+        </div>
+      </details>
+
+      <details class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Expenses (EGP/mo)</summary>
+        <div class="p-2 space-y-2">
+          <div><label class="block text-xs">Rent</label><input data-model="rent" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Rent Growth %/yr</label><input data-model="rentGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Rent Stop Month</label><input data-model="rentStopMonth" type="number" min="1" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Home</label><input data-model="homeExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Home Growth %/yr</label><input data-model="homeExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Alex</label><input data-model="alexExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Alex Growth %/yr</label><input data-model="alexExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Verena</label><input data-model="verenaExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Verena Growth %/yr</label><input data-model="verenaExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Emad</label><input data-model="emadExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Emad Growth %/yr</label><input data-model="emadExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Personal</label><input data-model="personalExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Personal Growth %/yr</label><input data-model="personalExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div><label class="block text-xs">Nursery</label><input data-model="nurseryExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div class="flex gap-2">
+             <div class="w-1/2"><label class="block text-xs">Nursery Start(M)</label><input data-model="nurseryStartMonth" type="number" min="1" class="border w-full p-1 rounded"></div>
+             <div class="w-1/2"><label class="block text-xs">School Start(Y)</label><input data-model="schoolStartYear" type="number" min="1" class="border w-full p-1 rounded"></div>
+          </div>
+          <div><label class="block text-xs">School (Annual from Jan)</label><input data-model="schoolExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+        </div>
+      </details>
+
+      <div class="mt-4 border-t pt-4">
+        <h3 class="font-bold mb-2">Custom Items</h3>
+        <div id="custom-items-list" class="flex flex-col gap-2 mb-3"></div>
+        <button onclick="openCustomModal(-1)" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 py-2 rounded font-semibold text-xs">+ Add Custom Item</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-4 overflow-y-auto bg-slate-50 relative" id="main-area">
+      <!-- Tabs -->
+      <div class="flex gap-4 mb-4 border-b pb-2 sticky -top-4 bg-slate-50 z-20 -mx-4 px-4 pt-4 shadow-sm">
+        <button id="tab-dashboard" class="px-4 py-2 border-b-2 border-blue-600 font-bold text-blue-600 bg-white shadow-sm" onclick="switchTab('dashboard')">Dashboard</button>
+        <button id="tab-report" class="px-4 py-2 text-gray-500 font-semibold hover:text-blue-600 bg-white/50 hover:bg-white" onclick="switchTab('report')">Financial Analysis Report</button>
+        <button id="tab-breakdown" class="px-4 py-2 text-gray-500 font-semibold hover:text-blue-600 bg-white/50 hover:bg-white" onclick="switchTab('breakdown')">Expenses Breakdown</button>
+      </div>
+
+      <div id="view-dashboard">
+      <!-- Warning Banner -->
+      <div id="warning-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded shadow text-sm"></div>
+
+      <!-- Financial Analysis KPI Dashboard -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4" id="kpi-dashboard"></div>
+
+      <!-- Controls & Chart -->
+      <div class="bg-white p-4 shadow rounded mb-4">
+        <div class="flex justify-between items-center mb-4 text-sm gap-2 flex-wrap">
+          <label class="font-bold">Chart: 
+            <select id="chart-type" class="border p-1 rounded ml-2 font-normal" onchange="render()">
+              <option value="line">Cumulative Balance (Line)</option>
+              <option value="stacked">Income vs Expense (Stacked Bar)</option>
+              <option value="bar">Year-End Balances (Bar)</option>
+            </select>
+          </label>
+          <div class="flex gap-2">
+            <button onclick="document.getElementById('upload-modal').classList.remove('hidden');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded">📤 Excel Import</button>
+            <button onclick="exportCSV('annual')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded">📥 CSV (Year)</button>
+            <button onclick="exportCSV('monthly')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded hidden md:block">📥 CSV (Month)</button>
+          </div>
+        </div>
+        <div class="relative w-full h-[300px]">
+          <canvas id="cfChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Tables -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white shadow rounded p-4 overflow-x-auto">
+          <h3 class="font-bold mb-2">Annual Summary</h3>
+          <table class="w-full text-xs text-right whitespace-nowrap" id="annual-table">
+            <thead class="bg-slate-100 border-b cursor-pointer select-none">
+              <tr><th class="text-left p-2">Year ↕</th><th class="p-2">Income ↕</th><th class="p-2">Expense ↕</th><th class="p-2">Net ↕</th><th class="p-2">End Balance ↕</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="bg-white shadow rounded p-4 overflow-x-auto">
+          <h3 class="font-bold mb-2">Monthly Detail</h3>
+          <table class="w-full text-xs text-right whitespace-nowrap" id="monthly-table">
+            <thead class="bg-slate-100 border-b cursor-pointer select-none">
+              <tr><th class="text-left p-2">Month ↕</th><th class="p-2">Income ↕</th><th class="p-2">Expense ↕</th><th class="p-2">Net ↕</th><th class="p-2">Cum. Balance ↕</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      </div> <!-- end view-dashboard -->
+
+      <div id="view-report" class="hidden space-y-6">
+        <!-- Section A: Liquidity Analysis -->
+        <div class="bg-white shadow rounded p-4 border border-x-8 border-y-0 border-blue-900 border-x-blue-800">
+          <h3 class="bg-blue-800 text-white p-2 font-bold mb-2 rounded-t uppercase text-sm">Liquidity Analysis</h3>
+          <table class="w-full text-sm text-left border-collapse" id="rep-liquidity">
+            <tbody class="divide-y"></tbody>
+          </table>
+        </div>
+        
+        <!-- Section B: Year-End Cumulative Balances -->
+        <div class="bg-white shadow rounded p-4 border border-x-8 border-y-0 border-teal-800 border-x-teal-700">
+          <h3 class="bg-teal-700 text-white p-2 font-bold mb-2 rounded-t uppercase text-sm tracking-wide">Year-End Cumulative Balances</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm text-right whitespace-nowrap" id="rep-year-end">
+              <thead class="bg-emerald-500 text-white">
+                <tr><th class="p-2 text-left">Year</th><th class="p-2">Year-End Balance (EGP)</th><th class="p-2">Annual Net Cash Flow (EGP)</th><th class="p-2">Annual Salary (EGP)</th><th class="p-2 text-left">Notes</th></tr>
+              </thead>
+              <tbody class="divide-y text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section C: Feasibility Verdict & Key Parameters -->
+        <div class="bg-white shadow rounded p-4 border border-x-8 border-y-0 border-blue-900 border-x-blue-800">
+          <h3 class="bg-slate-700 text-white p-2 font-bold mb-2 rounded-t uppercase text-sm tracking-wide">Feasibility Verdict & Key Parameters</h3>
+          <table class="w-full text-sm text-left border-collapse" id="rep-verdict">
+            <tbody class="divide-y"></tbody>
+          </table>
+        </div>
+      </div> <!-- end view-report -->
+
+      <div id="view-breakdown" class="hidden space-y-4">
+        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
+          <h2 class="text-xl font-bold">Expenses Breakdown</h2>
+          <button onclick="openCustomModal(-1); setTimeout(() => document.getElementById('ci-type').value='expense', 50);" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded shadow text-sm font-semibold">+ Add Custom Expense</button>
+        </div>
+        <div class="bg-white shadow rounded p-4 overflow-x-auto">
+          <table class="w-full text-sm text-right whitespace-nowrap" id="breakdown-table">
+            <thead class="bg-slate-100 border-b cursor-pointer select-none">
+              <tr>
+                <th class="text-left p-2">Expense Category ↕</th>
+                <th class="p-2">1 Month ↕</th>
+                <th class="p-2">1 Year (12m) ↕</th>
+                <th class="p-2">5 Years (60m) ↕</th>
+                <th class="p-2">10 Years (120m) ↕</th>
+                <th class="p-2">10Y % of Total ↕</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y text-xs"></tbody>
+            <tfoot class="font-bold bg-slate-50 text-slate-800 border-t-2 border-slate-300"></tfoot>
+          </table>
+        </div>
+      </div> <!-- end view-breakdown -->
+    </main>
+  </div>
+</div>
+
+<!-- Custom Item Modal -->
+<div id="custom-item-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+  <div class="bg-white p-6 rounded shadow-lg w-full max-w-sm text-sm">
+    <h3 class="font-bold text-lg mb-4" id="ci-modal-title">Custom Item</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="col-span-2"><label class="block text-xs">Name</label><input id="ci-name" class="border w-full p-2" type="text" autofocus></div>
+      <div><label class="block text-xs">Type</label><select id="ci-type" class="border w-full p-2"><option value="income">Income</option><option value="expense">Expense</option></select></div>
+      <div><label class="block text-xs">Currency</label><select id="ci-currency" class="border w-full p-2"><option value="EGP">EGP</option><option value="USD">USD</option><option value="AED">AED</option></select></div>
+      <div class="col-span-2"><label class="block text-xs">Amount</label><input id="ci-amount" min="0" class="border w-full p-2" type="number"></div>
+      <div><label class="block text-xs">Frequency</label><select id="ci-freq" class="border w-full p-2"><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="one-time">One-time</option></select></div>
+      <div><label class="block text-xs">Growth Rate %/yr</label><input id="ci-growth" class="border w-full p-2" type="number" value="0"></div>
+      <div><label class="block text-xs">Start Year</label><input id="ci-start-y" min="1" class="border w-full p-2" type="number" value="1"></div>
+      <div><label class="block text-xs">Start Month (1-12)</label><input id="ci-start-m" min="1" max="12" class="border w-full p-2" type="number" value="1"></div>
+      <div><label class="block text-xs">End Year</label><input id="ci-end-y" min="1" class="border w-full p-2" type="number" value="10"></div>
+      <div><label class="block text-xs">End Month (1-12)</label><input id="ci-end-m" min="1" max="12" class="border w-full p-2" type="number" value="12"></div>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button onclick="document.getElementById('custom-item-modal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 rounded">Cancel</button>
+      <button onclick="saveCustomItem()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rates Modal -->
+<div id="rate-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+  <div class="bg-white p-6 rounded shadow-lg w-full max-w-xs text-sm">
+    <h3 class="font-bold text-lg mb-4">Exchange Rates (vs EGP)</h3>
+    <div class="space-y-4">
+      <div><label class="block text-xs mb-1">1 USD =</label><input id="rate-usd" min="0.1" step="0.1" class="border w-full p-2" type="number"></div>
+      <div><label class="block text-xs mb-1">1 AED =</label><input id="rate-aed" min="0.1" step="0.1" class="border w-full p-2" type="number"></div>
+    </div>
+    <div class="mt-6 flex justify-end">
+      <button onclick="saveRates()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+  <div class="bg-white p-6 rounded shadow-lg w-full max-w-md text-sm max-h-screen overflow-y-auto">
+    <h3 class="font-bold text-lg mb-4">Upload Excel/CSV Data</h3>
+    <input type="file" id="excel-file" accept=".xlsx,.csv" class="mb-4 block w-full border p-2 rounded">
+    <div id="mapping-area" class="hidden">
+      <p class="font-bold mb-2">Map Columns</p>
+      <div id="mapping-fields" class="grid grid-cols-2 gap-2 mb-4"></div>
+      <label class="flex items-center gap-2"><input type="checkbox" id="replace-items"> Replace existing custom items?</label>
+    </div>
+    <div class="mt-6 flex justify-end gap-2">
+      <button onclick="closeUpload()" class="px-4 py-2 bg-slate-200 rounded">Cancel</button>
+      <button id="upload-process-btn" onclick="processUpload()" class="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded hidden">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI Chat Bot UI -->
+<button onclick="toggleChat()" class="fixed bottom-6 right-6 bg-blue-700 hover:bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-2xl z-40 transition-transform transform hover:scale-110">
+  <span class="text-2xl">✨</span>
+</button>
+
+<div id="ai-chat-window" class="hidden fixed bottom-24 right-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] max-h-[80vh] bg-white rounded-xl shadow-2xl z-50 flex-col border border-slate-200 overflow-hidden transform transition-all">
+  <div class="bg-blue-800 text-white p-3 flex justify-between items-center shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="text-xl">✨</span>
+      <div>
+        <h3 class="font-bold text-sm">Financial AI Assistant</h3>
+        <p class="text-[10px] text-blue-200">Powered by Gemini</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="openApiKeyModal()" class="text-blue-200 hover:text-white" title="Settings">⚙️</button>
+      <button onclick="toggleChat()" class="text-blue-200 hover:text-white font-bold text-lg leading-none">&times;</button>
+    </div>
+  </div>
+  <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-slate-50 flex flex-col gap-3 text-sm">
+    <div class="self-start bg-blue-100 text-blue-900 p-3 rounded-lg rounded-tl-none max-w-[85%] shadow-sm">
+      Hello! I'm your Financial Assistant. I can see your current cash flow dashboard live. Ask me anything, like exactly when your cash falls short or what purchase price you can actually afford based on your timeline!
+    </div>
+  </div>
+  <div class="p-3 bg-white border-t flex gap-2 shrink-0 items-end">
+    <textarea id="chat-input" rows="1" class="flex-1 border rounded-lg p-2 resize-none outline-none focus:border-blue-500 max-h-32 text-sm" placeholder="Ask about your finances..."></textarea>
+    <button onclick="sendChatMessage()" id="chat-send-btn" class="bg-blue-600 hover:bg-blue-500 text-white w-10 h-10 rounded-lg shrink-0 flex items-center justify-center">
+      <svg class="w-5 h-5 translate-y-[1px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+    </button>
+  </div>
+</div>
+
+<!-- API Key Modal -->
+<div id="api-key-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+  <div class="bg-white p-6 rounded shadow-lg w-full max-w-sm text-sm">
+    <h3 class="font-bold text-lg mb-2">Gemini API Key</h3>
+    <p class="text-xs text-gray-600 mb-4">To use the AI Assistant, please provide your Google Gemini API Key. This is saved completely locally in your browser and never sent to our servers.</p>
+    <div class="mb-2">
+      <label class="block text-xs font-bold mb-1">API Key</label>
+      <input type="password" id="gemini-api-key" class="border w-full p-2 rounded" placeholder="AIzaSy...">
+    </div>
+    <div class="mb-4">
+      <div class="flex justify-between items-end mb-1">
+        <label class="block text-xs font-bold">Model</label>
+        <button onclick="fetchModels()" class="text-[10px] bg-blue-100 text-blue-800 px-2 rounded hover:bg-blue-200">Fetch Available Models</button>
+      </div>
+      <input type="text" id="gemini-model" class="border w-full p-2 rounded" value="gemini-2.0-flash" placeholder="e.g. gemini-2.0-flash">
+    </div>
+    <div id="model-fetch-msg" class="text-[10px] text-green-600 mb-2 hidden"></div>
+    <div class="text-xs mb-4">
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-blue-600 hover:underline">Get a free key from Google AI Studio &rarr;</a>
+    </div>
+    <div class="flex justify-end gap-2">
+      <button onclick="document.getElementById('api-key-modal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 rounded">Cancel</button>
+      <button onclick="saveApiKey()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded">Save Key</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === State & Defaults ===
+const DEFAULTS = {
+  initialCash: 0,
+  purchaseDate: '2026-04', purchasePrice: 13000000, downPaymentPct: 5, loanTermYears: 8,
+  salary: 90000, salaryGrowth: 10, bonus: 1250000, bonusGrowth: 0,
+  otherIncome: 0, otherIncomeGrowth: 0,
+  rent: 18000, rentGrowth: 10, rentStopMonth: 60, homeExp: 15000, homeExpGrowth: 20,
+  alexExp: 10000, alexExpGrowth: 0, verenaExp: 4000, verenaExpGrowth: 20,
+  emadExp: 17000, emadExpGrowth: 10, personalExp: 20000, personalExpGrowth: 10, nurseryExp: 10000, nurseryStartMonth: 12,
+  schoolExp: 200000, schoolStartYear: 4
+};
+
+let user = null, scenarios = [], currIdx = 0, chartInst = null, uploadData = [];
+const fmt = new Intl.NumberFormat('en-US');
+const v = id => parseFloat(document.getElementById(id).value) || 0;
+const getId = id => document.getElementById(id);
+
+// === Auth & Storage ===
+function refreshProfileList() {
+  const profiles = [];
+  for(let i=0; i<localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if(k.startsWith('cfm_')) {
+      profiles.push(k.substring(4));
+    }
+  }
+  
+  const list = getId('profile-list');
+  const area = getId('profile-selection-area');
+  const sep = getId('login-separator');
+  const sepText = getId('login-separator-text');
+  
+  if(profiles.length > 0) {
+    area.classList.remove('hidden');
+    sep.classList.remove('hidden');
+    sepText.classList.remove('hidden');
+    list.innerHTML = profiles.map(p => `
+      <button onclick="login('${p}')" class="flex items-center gap-3 w-full p-3 bg-slate-50 hover:bg-white border hover:border-blue-500 hover:shadow-md rounded-xl transition-all group text-left">
+        <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm group-hover:bg-blue-600 group-hover:text-white transition-colors">${p[0].toUpperCase()}</div>
+        <span class="font-bold text-slate-700">${p}</span>
+        <svg class="ml-auto w-4 h-4 text-slate-300 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+      </button>
+    `).join('');
+  } else {
+    area.classList.add('hidden');
+    sep.classList.add('hidden');
+    sepText.classList.add('hidden');
+  }
+}
+
+function login(savedUser) {
+  const u = (savedUser || getId('username').value).trim();
+  if(!u) return;
+  user = u;
+  getId('login-screen').classList.add('hidden');
+  getId('app-screen').classList.remove('hidden');
+  getId('user-display').innerText = u;
+  let data = localStorage.getItem('cfm_' + user);
+  if(data) { 
+    scenarios = JSON.parse(data); 
+    scenarios.forEach(s => s.assumptions = Object.assign({}, DEFAULTS, s.assumptions));
+  }
+  else { scenarios = [createScenario('Current Plan')]; save(); }
+  currIdx = Math.min(currIdx, Math.max(0, scenarios.length - 1));
+  loadUI();
+}
+
+function logout() {
+  user = null; scenarios = []; currIdx = 0;
+  getId('login-screen').classList.remove('hidden');
+  getId('app-screen').classList.add('hidden');
+  getId('username').value = '';
+  refreshProfileList();
+}
+
+function clearAllProfiles() {
+  if(!confirm("Are you sure you want to PERMANENTLY delete all saved profiles and their financial data? This cannot be undone.")) return;
+  const keys = [];
+  for(let i=0; i<localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if(k.startsWith('cfm_')) keys.push(k);
+  }
+  keys.forEach(k => localStorage.removeItem(k));
+  refreshProfileList();
+}
+
+function save() {
+  if(user) localStorage.setItem('cfm_' + user, JSON.stringify(scenarios));
+}
+
+function createScenario(name) {
+  return { id: Date.now(), name, displayCurr: 'EGP', rates: { USD: 50, AED: 13.6 }, assumptions: {...DEFAULTS}, customItems: [] };
+}
+
+// === Scenario Management ===
+function switchScenario() {
+  currIdx = parseInt(getId('scenario-select').value);
+  loadUI();
+}
+function newScenario() {
+  let n = prompt("Scenario Name:");
+  if(!n) return;
+  scenarios.push(createScenario(n));
+  currIdx = scenarios.length - 1;
+  save(); loadUI();
+}
+function copyScenario() {
+  let n = prompt("New Scenario Name:", scenarios[currIdx].name + " Copy");
+  if(!n) return;
+  let s = JSON.parse(JSON.stringify(scenarios[currIdx]));
+  s.id = Date.now(); s.name = n;
+  scenarios.push(s);
+  currIdx = scenarios.length - 1;
+  save(); loadUI();
+}
+function delScenario() {
+  if(scenarios.length <= 1) return alert("Cannot delete last scenario.");
+  if(!confirm("Delete scenario?")) return;
+  scenarios.splice(currIdx, 1);
+  currIdx = Math.max(0, currIdx - 1);
+  save(); loadUI();
+}
+
+// === UI Syncing ===
+function loadUI() {
+  let sc = scenarios[currIdx];
+  // Rebuild select
+  const sel = getId('scenario-select');
+  sel.innerHTML = scenarios.map((s,i) => `<option value="${i}">${s.name}</option>`).join('');
+  sel.value = currIdx;
+  
+  getId('disp-curr').value = sc.displayCurr;
+  getId('rate-usd').value = sc.rates.USD;
+  getId('rate-aed').value = sc.rates.AED;
+  
+  // Populate inputs
+  document.querySelectorAll('[data-model]').forEach(el => {
+    let k = el.getAttribute('data-model');
+    if(sc.assumptions[k] !== undefined) el.value = sc.assumptions[k];
+  });
+  
+  render();
+}
+
+function saveInputs() {
+  let sc = scenarios[currIdx];
+  document.querySelectorAll('[data-model]').forEach(el => {
+    let k = el.getAttribute('data-model');
+    if(el.type === 'number') {
+      let v = Number(el.value);
+      sc.assumptions[k] = isNaN(v) ? 0 : v;
+    }
+    else if(el.type === 'checkbox') sc.assumptions[k] = el.checked;
+    else sc.assumptions[k] = el.value;
+  });
+  
+  // Hard fallback for Initial Cash explicitly
+  let icEl = document.querySelector('input[data-model="initialCash"]');
+  if(icEl && icEl.value) {
+     let v = Number(icEl.value);
+     sc.assumptions['initialCash'] = isNaN(v) ? 0 : v;
+  }
+
+  save(); render();
+}
+
+function updateDispCurr() { scenarios[currIdx].displayCurr = getId('disp-curr').value; save(); render(); }
+function saveRates() {
+  scenarios[currIdx].rates.USD = v('rate-usd') || 50;
+  scenarios[currIdx].rates.AED = v('rate-aed') || 13.6;
+  save(); render();
+  getId('rate-modal').classList.add('hidden');
+}
+
+// === Custom Items ===
+let editCiId = -1;
+function renderCustomItems() {
+  const sc = scenarios[currIdx];
+  const list = getId('custom-items-list');
+  list.innerHTML = sc.customItems.map((ci, i) => `
+    <div class="flex justify-between items-center bg-slate-100 border p-2 rounded">
+      <div>
+        <div class="font-bold whitespace-nowrap overflow-hidden text-ellipsis w-24 md:w-32">${ci.name}</div>
+        <div class="${ci.type === 'income' ? 'text-green-600' : 'text-red-600'} text-xs">
+          ${fmt.format(ci.amount)} ${ci.currency} (${ci.freq})
+        </div>
+        <div class="text-[10px] text-gray-500">Y${ci.sy}M${ci.sm} to Y${ci.ey}M${ci.em}</div>
+      </div>
+      <div class="flex flex-col gap-1">
+        <button onclick="openCustomModal(${i})" class="text-xs bg-white border px-2 py-1 rounded shadow-sm hover:bg-slate-50">Edit</button>
+        <button onclick="delCustomItem(${i})" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded shadow-sm hover:bg-red-200">Del</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCustomModal(i) {
+  editCiId = i;
+  const sc = scenarios[currIdx];
+  getId('ci-modal-title').innerText = i < 0 ? "New Custom Item" : "Edit Custom Item";
+  let ci = i >= 0 ? sc.customItems[i] : { name:'', type:'expense', currency:'EGP', amount:'', freq:'monthly', growth:0, sy:1, sm:1, ey:10, em:12 };
+  
+  getId('ci-name').value = ci.name; getId('ci-type').value = ci.type;
+  getId('ci-currency').value = ci.currency; getId('ci-amount').value = ci.amount;
+  getId('ci-freq').value = ci.freq; getId('ci-growth').value = ci.growth;
+  getId('ci-start-y').value = ci.sy; getId('ci-start-m').value = ci.sm;
+  getId('ci-end-y').value = ci.ey; getId('ci-end-m').value = ci.em;
+  
+  getId('custom-item-modal').classList.remove('hidden');
+}
+
+function saveCustomItem() {
+  const sy = v('ci-start-y'), sm = v('ci-start-m'), ey = v('ci-end-y'), em = v('ci-end-m');
+  if(sy*12 + sm > ey*12 + em) return alert("Start date must be before end date");
+  if(v('ci-amount') < 0) return alert("Amount must be positive");
+  
+  let ci = {
+    id: editCiId < 0 ? Date.now() : scenarios[currIdx].customItems[editCiId].id,
+    name: getId('ci-name').value || 'Item', type: getId('ci-type').value,
+    currency: getId('ci-currency').value, amount: v('ci-amount'),
+    freq: getId('ci-freq').value, growth: v('ci-growth'),
+    sy, sm, ey, em
+  };
+  
+  if(editCiId < 0) scenarios[currIdx].customItems.push(ci);
+  else scenarios[currIdx].customItems[editCiId] = ci;
+  
+  save(); render();
+  getId('custom-item-modal').classList.add('hidden');
+}
+
+function delCustomItem(i) {
+  scenarios[currIdx].customItems.splice(i, 1);
+  save(); render();
+}
+
+// === Calculation Engine ===
+function calcCashFlow(sc, months) {
+  const rT = c => c==='USD'?sc.rates.USD : c==='AED'?sc.rates.AED : 1;
+  const cvt = (amt, from, to) => amt * rT(from) / rT(to);
+  const a = sc.assumptions;
+  let flow = [], cum = 0, dC = sc.displayCurr;
+  
+  let dp = a.purchasePrice * (a.downPaymentPct / 100);
+  let inst = (a.purchasePrice - dp) / (a.loanTermYears * 4);
+  let loanMs = a.loanTermYears * 12;
+  
+  let startYYYYMM = String(a.purchaseDate || '2026-04');
+  if(!startYYYYMM.includes('-')) startYYYYMM = '2026-04';
+  let purYear = parseInt(startYYYYMM.split('-')[0], 10);
+  let purMonth = parseInt(startYYYYMM.split('-')[1], 10);
+  const mNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const getAbs = m => {
+    let d = new Date(purYear, purMonth - 1 + (m - 1));
+    if(m === 0) d = new Date(purYear, purMonth - 2);
+    return { calYear: d.getFullYear(), calMonth: mNames[d.getMonth()], label: `${mNames[d.getMonth()]} ${d.getFullYear()}` };
+  };
+  
+  let abs0 = getAbs(0);
+  let initial = a.initialCash || 0;
+  flow.push({ m:0, y:0, miny:0, calYear:abs0.calYear, calMonth:abs0.calMonth, absLabel:abs0.label, inc:cvt(initial,'EGP',dC), exp:cvt(dp,'EGP',dC), net:cvt(initial-dp,'EGP',dC), cum:cvt(initial-dp,'EGP',dC) });
+  cum = initial - dp; // Keep internal cum in EGP
+
+  for(let m=1; m<=months; m++) {
+    let y = Math.ceil(m/12), miny = m - (y-1)*12;
+    let abs = getAbs(m);
+    let inE=0, exE=0;
+    
+    // Core
+    inE += a.salary * Math.pow(1 + (a.salaryGrowth||0)/100, y-1);
+    inE += (a.otherIncome||0) * Math.pow(1 + (a.otherIncomeGrowth||0)/100, y-1);
+    
+    // Bonus absolute tracking
+    if(abs.calMonth === 'Mar' && abs.calYear > purYear) {
+      inE += (a.bonus||0) * Math.pow(1 + (a.bonusGrowth||0)/100, abs.calYear - purYear - 1);
+    }
+    
+    if(m <= a.rentStopMonth) exE += a.rent * Math.pow(1 + (a.rentGrowth||0)/100, y-1);
+    exE += a.homeExp * Math.pow(1 + a.homeExpGrowth/100, y-1);
+    exE += a.alexExp * Math.pow(1 + a.alexExpGrowth/100, y-1);
+    exE += a.verenaExp * Math.pow(1 + a.verenaExpGrowth/100, y-1);
+    exE += (a.emadExp * Math.pow(1 + (a.emadExpGrowth||0)/100, y-1)) + (a.personalExp * Math.pow(1 + (a.personalExpGrowth||0)/100, y-1));
+    
+    if(m >= a.nurseryStartMonth && m <= (a.schoolStartYear-1)*12) exE += a.nurseryExp;
+    
+    // School absolute tracking
+    if(y >= a.schoolStartYear && abs.calMonth === 'Jan') {
+       exE += a.schoolExp;
+    }
+    
+    if(m%3 === 0 && m <= loanMs) exE += inst;
+    
+    // Custom
+    for(let ci of sc.customItems) {
+      let stM = (ci.sy-1)*12 + ci.sm, enM = (ci.ey-1)*12 + ci.em;
+      if(m >= stM && m <= enM) {
+        let act = false;
+        if(ci.freq === 'monthly') act = true;
+        else if(ci.freq === 'annual' && (m-stM)%12 === 0) act = true;
+        else if(ci.freq === 'one-time' && m === stM) act = true;
+        
+        if(act) {
+          let cY = Math.floor((m-stM)/12);
+          let amt = ci.amount * Math.pow(1 + ci.growth/100, cY);
+          let valE = cvt(amt, ci.currency, 'EGP');
+          if(ci.type === 'income') inE += valE; else exE += valE;
+        }
+      }
+    }
+    
+    cum += (inE - exE);
+    flow.push({ 
+      m, y, miny, calYear:abs.calYear, calMonth:abs.calMonth, absLabel:abs.label,
+      inc: cvt(inE,'EGP',dC), exp: cvt(exE,'EGP',dC), 
+      net: cvt(inE-exE,'EGP',dC), cum: cvt(cum,'EGP',dC) 
+    });
+  }
+  return flow;
+}
+
+// === Rendering ===
+function render() {
+  renderCustomItems();
+  const sc = scenarios[currIdx];
+  const tv = parseInt(getId('time-view').value);
+  const flow = calcCashFlow(sc, tv);
+  const dC = sc.displayCurr;
+  
+  // Warning
+  let minC = 0, minF = null, minL = null;
+  for(let f of flow) {
+    if(f.cum < 0) {
+      if(minF === null) minF = f.m;
+      minL = f.m;
+      minC = Math.min(minC, f.cum);
+    }
+  }
+  const wb = getId('warning-banner');
+  if(minC < 0) {
+    wb.classList.remove('hidden');
+    wb.innerHTML = `<b>⚠️ Deficit detected!</b> Cash balance is negative from Month <b>${minF}</b> to <b>${minL}</b>. Lowest point: <b>${fmt.format(Math.abs(minC))} ${sc.displayCurr}</b> shortfall.`;
+  } else wb.classList.add('hidden');
+  
+  // KPIs
+  let totalInc = flow.reduce((s,f) => s+f.inc, 0);
+  let totalExp = flow.reduce((s,f) => s+f.exp, 0);
+  let endBal = flow[flow.length-1].cum;
+  getId('kpi-dashboard').innerHTML = `
+    <div class="bg-white p-4 rounded shadow border-l-4 border-blue-500 flex flex-col justify-center">
+      <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Starting Cash</div>
+      <div class="text-xl font-black text-slate-800">${fmt.format(Number(sc.assumptions.initialCash) || 0)} <span class="text-xs text-slate-500 font-normal">EGP</span></div>
+    </div>
+    <div class="bg-white p-4 rounded shadow border-l-4 border-green-500 flex flex-col justify-center">
+      <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Period Income</div>
+      <div class="text-xl font-black text-green-700">${fmt.format(totalInc)} <span class="text-xs text-green-600/70 font-normal">${dC}</span></div>
+    </div>
+    <div class="bg-white p-4 rounded shadow border-l-4 border-red-500 flex flex-col justify-center">
+      <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Period Expense</div>
+      <div class="text-xl font-black text-red-700">${fmt.format(totalExp)} <span class="text-xs text-red-600/70 font-normal">${dC}</span></div>
+    </div>
+    <div class="bg-white p-4 rounded shadow border-l-4 ${endBal >= 0 ? 'border-indigo-500' : 'border-red-500'} flex flex-col justify-center">
+      <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Ending Net Balance</div>
+      <div class="text-xl font-black ${endBal >= 0 ? 'text-indigo-700' : 'text-red-700'}">${fmt.format(endBal)} <span class="text-xs text-indigo-500/70 font-normal">${dC}</span></div>
+    </div>
+  `;
+
+  // Chart
+  const ctx = getId('cfChart').getContext('2d');
+  if(chartInst) chartInst.destroy();
+  const cType = getId('chart-type').value;
+  
+  if(cType === 'line') {
+    chartInst = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: flow.map(f => f.m===0 ? `${f.absLabel} (Start)` : f.absLabel),
+        datasets: [{ label:`Cum. Balance (${dC})`, data: flow.map(f=>f.cum), borderColor: '#2563eb', backgroundColor:'rgba(37,99,235,0.1)', fill:true }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  } else if(cType === 'stacked') {
+    chartInst = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: flow.map(f => f.m===0 ? `${f.absLabel} (Start)` : f.absLabel),
+        datasets: [
+          { label:'Income', data: flow.map(f=>f.inc), backgroundColor: '#16a34a' },
+          { label:'Expense', data: flow.map(f=>f.exp), backgroundColor: '#dc2626' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, scales: { x:{stacked:true}, y:{stacked:true} } }
+    });
+  } else {
+    let ys = [], yl = [];
+    for(let i=1; i<=Math.ceil(tv/12); i++){
+      let mo = flow.find(x => x.y === i && x.miny === 12) || flow.filter(x=>x.y===i).pop();
+      if(mo) { ys.push(mo.cum); yl.push(`Year ${i}`); }
+    }
+    chartInst = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: yl, datasets: [{ label:`Year-End Balance (${dC})`, data: ys, backgroundColor: '#ca8a04' }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
+  
+  // Tables
+  const tcls = v => v >= 0 ? 'text-green-700 font-medium' : 'text-red-700 font-bold';
+  const aTb = getId('annual-table').querySelector('tbody'), mTb = getId('monthly-table').querySelector('tbody');
+  
+  let aT = '';
+  let yearsMap = {};
+  flow.forEach(f => {
+    if(!yearsMap[f.calYear]) yearsMap[f.calYear] = [];
+    yearsMap[f.calYear].push(f);
+  });
+  
+  Object.keys(yearsMap).sort().forEach(yStr => {
+    let yf = yearsMap[yStr];
+    let inc = yf.reduce((s,f)=>s+f.inc, 0), exp = yf.reduce((s,f)=>s+f.exp, 0);
+    let net = inc - exp, cum = yf[yf.length-1].cum;
+    aT += `<tr><td class="text-left p-2 border-b">${yStr}</td><td class="p-2 border-b">${fmt.format(inc)}</td><td class="p-2 border-b">${fmt.format(exp)}</td><td class="p-2 border-b ${tcls(net)}">${fmt.format(net)}</td><td class="p-2 border-b ${tcls(cum)}">${fmt.format(cum)}</td></tr>`;
+  });
+  aTb.innerHTML = aT;
+  
+  let mT = '';
+  let yInc = 0, yExp = 0, yNet = 0;
+  for(let i=0; i<flow.length; i++) {
+    let f = flow[i];
+    yInc += f.inc; yExp += f.exp; yNet += f.net;
+    mT += `<tr><td class="text-left p-2 border-b">${f.m===0 ? `${f.absLabel} (Start)` : `${f.absLabel} (M${f.m})`}</td><td class="p-2 border-b text-green-700">${fmt.format(f.inc)}</td><td class="p-2 border-b text-red-700">${fmt.format(f.exp)}</td><td class="p-2 border-b ${tcls(f.net)}">${fmt.format(f.net)}</td><td class="p-2 border-b ${tcls(f.cum)}">${fmt.format(f.cum)}</td></tr>`;
+    
+    if (f.calMonth === 'Dec' || i === flow.length - 1) {
+       mT += `<tr class="bg-blue-50 font-bold border-t-2 border-blue-200"><td class="text-left p-2 border-b text-blue-900">${f.calYear} Year-End Summary</td><td class="p-2 border-b text-green-800">${fmt.format(yInc)}</td><td class="p-2 border-b text-red-800">${fmt.format(yExp)}</td><td class="p-2 border-b ${tcls(yNet)}">${fmt.format(yNet)}</td><td class="p-2 border-b text-blue-900">${fmt.format(f.cum)}</td></tr>`;
+       yInc = 0; yExp = 0; yNet = 0;
+    }
+  }
+  mTb.innerHTML = mT;
+  
+  populateReport(flow, tv, sc);
+  renderBreakdown();
+}
+
+function renderBreakdown() {
+  const sc = scenarios[currIdx], a = sc.assumptions;
+  const rT = c => c==='USD'?sc.rates.USD : c==='AED'?sc.rates.AED : 1;
+  const cvt = (amt, from, to) => amt * rT(from) / rT(to);
+  const dC = sc.displayCurr;
+  
+  const cats = {
+    'Apartment Inst. & Down Pmt': { 1:0, 12:0, 60:0, 120:0 },
+    'Rent': { 1:0, 12:0, 60:0, 120:0 },
+    'Home Expenses': { 1:0, 12:0, 60:0, 120:0 },
+    'Alex Expenses': { 1:0, 12:0, 60:0, 120:0 },
+    'Verena Expenses': { 1:0, 12:0, 60:0, 120:0 },
+    'Emad Expenses': { 1:0, 12:0, 60:0, 120:0 },
+    'Personal Expenses': { 1:0, 12:0, 60:0, 120:0 },
+    'Nursery': { 1:0, 12:0, 60:0, 120:0 },
+    'School': { 1:0, 12:0, 60:0, 120:0 }
+  };
+  
+  let customExp = {};
+  
+  let dp = cvt(a.purchasePrice * (a.downPaymentPct / 100), 'EGP', dC);
+  cats['Apartment Inst. & Down Pmt'][1] += dp;
+  cats['Apartment Inst. & Down Pmt'][12] += dp;
+  cats['Apartment Inst. & Down Pmt'][60] += dp;
+  cats['Apartment Inst. & Down Pmt'][120] += dp;
+  
+  let instEGP = (a.purchasePrice - (a.purchasePrice * (a.downPaymentPct / 100))) / (a.loanTermYears * 4);
+  let loanMs = a.loanTermYears * 12;
+
+  for(let m=1; m<=120; m++) {
+    let y = Math.ceil(m/12), miny = m - (y-1)*12;
+    
+    let mexp = {
+      'Rent': m <= a.rentStopMonth ? cvt(a.rent * Math.pow(1 + (a.rentGrowth||0)/100, y-1), 'EGP', dC) : 0,
+      'Home Expenses': cvt(a.homeExp * Math.pow(1 + a.homeExpGrowth/100, y-1), 'EGP', dC),
+      'Alex Expenses': cvt(a.alexExp * Math.pow(1 + a.alexExpGrowth/100, y-1), 'EGP', dC),
+      'Verena Expenses': cvt(a.verenaExp * Math.pow(1 + a.verenaExpGrowth/100, y-1), 'EGP', dC),
+      'Emad Expenses': cvt(a.emadExp * Math.pow(1 + (a.emadExpGrowth||0)/100, y-1), 'EGP', dC),
+      'Personal Expenses': cvt(a.personalExp * Math.pow(1 + (a.personalExpGrowth||0)/100, y-1), 'EGP', dC),
+      'Nursery': (m >= a.nurseryStartMonth && m <= (a.schoolStartYear-1)*12) ? cvt(a.nurseryExp, 'EGP', dC) : 0,
+      'School': (y >= a.schoolStartYear && miny === 1) ? cvt(a.schoolExp, 'EGP', dC) : 0,
+      'Apartment Inst. & Down Pmt': (m%3 === 0 && m <= loanMs) ? cvt(instEGP, 'EGP', dC) : 0
+    };
+    
+    if(m <= 1) Object.keys(mexp).forEach(k => cats[k][1] += mexp[k]);
+    if(m <= 12) Object.keys(mexp).forEach(k => cats[k][12] += mexp[k]);
+    if(m <= 60) Object.keys(mexp).forEach(k => cats[k][60] += mexp[k]);
+    if(m <= 120) Object.keys(mexp).forEach(k => cats[k][120] += mexp[k]);
+    
+    for(let ci of sc.customItems) {
+      if(ci.type === 'expense') {
+        if(!customExp[ci.name]) customExp[ci.name] = {1:0, 12:0, 60:0, 120:0};
+        let stM = (ci.sy-1)*12 + ci.sm, enM = (ci.ey-1)*12 + ci.em;
+        if(m >= stM && m <= enM) {
+          let act = false;
+          if(ci.freq === 'monthly') act = true;
+          else if(ci.freq === 'annual' && (m-stM)%12 === 0) act = true;
+          else if(ci.freq === 'one-time' && m === stM) act = true;
+          
+          if(act) {
+            let cY = Math.floor((m-stM)/12);
+            let val = cvt(ci.amount * Math.pow(1 + ci.growth/100, cY), ci.currency, dC);
+            if(m <= 1) customExp[ci.name][1] += val;
+            if(m <= 12) customExp[ci.name][12] += val;
+            if(m <= 60) customExp[ci.name][60] += val;
+            if(m <= 120) customExp[ci.name][120] += val;
+          }
+        }
+      }
+    }
+  }
+  
+  let allCats = {...cats, ...customExp};
+  let grandTotal10y = 0, grand1=0, grand12=0, grand60=0;
+  Object.values(allCats).forEach(v => { grandTotal10y+=v[120]; grand1+=v[1]; grand12+=v[12]; grand60+=v[60]; });
+  
+  let tbody = '', keys = Object.keys(allCats).sort((a,b) => allCats[b][120] - allCats[a][120]);
+  
+  keys.forEach(k => {
+    let vals = allCats[k];
+    let ratio = grandTotal10y > 0 ? (vals[120]/grandTotal10y)*100 : 0;
+    if(vals[120] > 0) {
+      tbody += `<tr class="hover:bg-slate-50">
+        <td class="text-left font-semibold p-2 border-b">${k}</td>
+        <td class="p-2 border-b text-red-700">${fmt.format(vals[1])}</td>
+        <td class="p-2 border-b text-red-700">${fmt.format(vals[12])}</td>
+        <td class="p-2 border-b text-red-700">${fmt.format(vals[60])}</td>
+        <td class="p-2 border-b text-red-700 font-bold">${fmt.format(vals[120])}</td>
+        <td class="p-2 border-b text-blue-700 font-bold">${ratio.toFixed(1)}%</td>
+      </tr>`;
+    }
+  });
+  
+  document.getElementById('breakdown-table').querySelector('tbody').innerHTML = tbody;
+  document.getElementById('breakdown-table').querySelector('tfoot').innerHTML = `<tr>
+    <td class="text-left p-2 uppercase tracking-wider text-[10px]">Grand Total</td>
+    <td class="p-2">${fmt.format(grand1)}</td>
+    <td class="p-2">${fmt.format(grand12)}</td>
+    <td class="p-2">${fmt.format(grand60)}</td>
+    <td class="p-2">${fmt.format(grandTotal10y)}</td>
+    <td class="p-2">100.0%</td>
+  </tr>`;
+}
+
+// === Tab Logic ===
+function switchTab(tabId) {
+  ['dashboard','report','breakdown'].forEach(t => {
+    document.getElementById('view-'+t).classList.toggle('hidden', t !== tabId);
+    let btn = document.getElementById('tab-'+t);
+    if(t === tabId) {
+      btn.classList.add('border-b-2','border-blue-600','font-bold','text-blue-600','bg-white','shadow-sm');
+      btn.classList.remove('text-gray-500','font-semibold','bg-white/50');
+    } else {
+      btn.classList.remove('border-b-2','border-blue-600','font-bold','text-blue-600','bg-white','shadow-sm');
+      btn.classList.add('text-gray-500','font-semibold','bg-white/50');
+    }
+  });
+  document.getElementById('main-area').scrollTo(0,0);
+}
+
+// === Report Rendering ===
+function populateReport(flow, tv, sc) {
+  const a = sc.assumptions;
+  const dC = sc.displayCurr;
+  const tcls = v => v >= 0 ? 'text-green-700 font-medium' : 'text-red-700 font-bold';
+
+  let minBal = 0, minMo = 0, negMos = 0, maxBal = 0;
+  flow.forEach(f => {
+    if(f.cum < minBal) { minBal = f.cum; minMo = f.m; }
+    if(f.cum < 0) negMos++;
+    if(f.cum > maxBal) maxBal = f.cum;
+  });
+  
+  let y1Sal = a.salary * 12, y10Sal = a.salary * Math.pow(1+(a.salaryGrowth||0)/100, 9) * 12;
+  let y1He = a.homeExp * 12, y5He = a.homeExp * Math.pow(1+(a.homeExpGrowth||0)/100, 4) * 12, y10He = a.homeExp * Math.pow(1+(a.homeExpGrowth||0)/100, 9) * 12;
+
+  document.getElementById('rep-liquidity').querySelector('tbody').innerHTML = `
+    <tr><td class="p-2 font-bold w-1/3">Lowest Cumulative Balance</td><td class="p-2 ${tcls(minBal)} bg-red-50">${fmt.format(minBal)}</td><td class="p-2 text-xs text-gray-500 italic">Peak liquidity stress &mdash; if negative, buffer needed</td></tr>
+    <tr><td class="p-2 font-bold">Month of Lowest Balance</td><td class="p-2">${minMo} months</td><td class="p-2 text-xs text-gray-500 italic">Month number where lowest point occurs</td></tr>
+    <tr><td class="p-2 font-bold">Total Months with Negative Balance</td><td class="p-2">${negMos} months</td><td class="p-2 text-xs text-gray-500 italic">Count of months where balance < 0</td></tr>
+    <tr><td class="p-2 font-bold">Maximum Positive Balance Achieved</td><td class="p-2 text-green-700 bg-green-50">${fmt.format(maxBal)}</td><td class="p-2 text-xs text-gray-500 italic">Peak liquidity point over ${Math.ceil(tv/12)} years</td></tr>
+    <tr><td class="p-2 font-bold border-t border-slate-300 bg-slate-50">Year 1 Annual Salary</td><td class="p-2 border-t border-slate-300 bg-slate-50">${fmt.format(y1Sal)}</td><td class="p-2 border-t border-slate-300 bg-slate-50 text-xs text-gray-500 italic">Base salary</td></tr>
+    <tr><td class="p-2 font-bold bg-slate-50">Year 10 Annual Salary</td><td class="p-2 bg-slate-50">${fmt.format(y10Sal)}</td><td class="p-2 text-xs text-gray-500 italic bg-slate-50">After 9 annual ${a.salaryGrowth||0}% raises</td></tr>
+    <tr><td class="p-2 font-bold border-t border-slate-300 bg-slate-50">Year 1 Annual Home Exp</td><td class="p-2 border-t border-slate-300 bg-slate-50">${fmt.format(y1He)}</td><td class="p-2 border-t border-slate-300 bg-slate-50 text-xs text-gray-500 italic">Base home expenses</td></tr>
+    <tr><td class="p-2 font-bold bg-slate-50">Year 5 Annual Home Exp</td><td class="p-2 bg-slate-50">${fmt.format(y5He)}</td><td class="p-2 text-xs text-gray-500 italic bg-slate-50">After 4 annual ${a.homeExpGrowth||0}% raises (Year 5)</td></tr>
+    <tr><td class="p-2 font-bold bg-slate-50">Year 10 Annual Home Exp</td><td class="p-2 bg-slate-50">${fmt.format(y10He)}</td><td class="p-2 text-xs text-gray-500 italic bg-slate-50">After 9 annual ${a.homeExpGrowth||0}% raises (Year 10)</td></tr>
+  `;
+
+  let ye = '';
+  let yearsMap = {};
+  flow.forEach(f => {
+    if(!yearsMap[f.calYear]) yearsMap[f.calYear] = [];
+    yearsMap[f.calYear].push(f);
+  });
+  
+  Object.keys(yearsMap).sort().forEach(yStr => {
+    let yf = yearsMap[yStr];
+    let relYs = [...new Set(yf.map(f=>f.y))];
+    let yMax = Math.max(...relYs);
+    
+    let inc = yf.reduce((s,f)=>s+f.inc, 0), exp = yf.reduce((s,f)=>s+f.exp, 0);
+    let net = inc - exp, cum = yf[yf.length-1].cum;
+    
+    let notes = [];
+    if(yMax*12 <= a.rentStopMonth) notes.push("Rent active"); else if(yMax*12 >= a.rentStopMonth) notes.push("Rent stopped");
+    if(yMax*12 >= a.nurseryStartMonth && yMax < a.schoolStartYear) notes.push("Nursery active");
+    if(relYs.includes(a.schoolStartYear)) notes.push("School starts");
+    if(relYs.includes(a.loanTermYears)) notes.push("Inst. complete");
+    let annSal = a.salary * Math.pow(1+(a.salaryGrowth||0)/100, yMax-1) * 12;
+
+    ye += `<tr class="hover:bg-teal-50"><td class="p-2 text-left font-bold w-24">${yStr}</td><td class="p-2 ${tcls(cum)} font-bold w-48">${fmt.format(cum)}</td><td class="p-2 ${tcls(net)} font-bold w-48">${fmt.format(net)}</td><td class="p-2 text-gray-800 w-48">${fmt.format(annSal)}</td><td class="p-2 text-left italic text-gray-500">${notes.join(' | ')}</td></tr>`;
+  });
+  document.getElementById('rep-year-end').querySelector('tbody').innerHTML = ye;
+
+  let qInst = (a.purchasePrice - (a.purchasePrice*(a.downPaymentPct/100))) / (a.loanTermYears * 4);
+  let verdict = minBal >= 0 ? '✓ FEASIBLE — Funding plan sustainable' : '✕ CHALLENGING — Extended negative balance requires funding';
+  let bcls = minBal >= 0 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50';
+  document.getElementById('rep-verdict').querySelector('tbody').innerHTML = `
+    <tr><td class="p-2 font-bold w-1/3">Purchase Price</td><td class="p-2 font-bold">${fmt.format(a.purchasePrice)}</td><td class="p-2 text-xs text-gray-500 italic">${fmt.format(a.purchasePrice)} EGP</td></tr>
+    <tr><td class="p-2 font-bold">Plan Duration</td><td class="p-2 font-bold">${a.loanTermYears} years</td><td class="p-2 text-xs text-gray-500 italic">${a.loanTermYears} years</td></tr>
+    <tr><td class="p-2 font-bold">Quarterly Installment</td><td class="p-2 font-bold">${fmt.format(Math.round(qInst))}</td><td class="p-2 text-xs text-gray-500 italic">Auto-calculated</td></tr>
+    <tr><td class="p-2 font-bold border-b border-slate-300">Rent Period</td><td class="p-2 border-b border-slate-300 font-bold">${Math.round(a.rentStopMonth/12)} years (Months 1-${a.rentStopMonth})</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Years 1-${Math.round(a.rentStopMonth/12)} inclusive</td></tr>
+    <tr><td class="p-2 font-bold">Home Exp Growth</td><td class="p-2 font-bold">${a.homeExpGrowth||0}%</td><td class="p-2 text-xs text-gray-500 italic">${a.homeExpGrowth||0}% per year</td></tr>
+    <tr><td class="p-2 font-bold">Verena Exp Growth</td><td class="p-2 font-bold">${a.verenaExpGrowth||0}%</td><td class="p-2 text-xs text-gray-500 italic">${a.verenaExpGrowth||0}% per year</td></tr>
+    <tr><td class="p-2 font-bold border-b border-slate-300">Nursery Active Period</td><td class="p-2 border-b border-slate-300 font-bold">Month ${a.nurseryStartMonth} &rarr; Year ${a.schoolStartYear-1} end</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Stops year before school</td></tr>
+    <tr><td class="p-2 font-bold text-lg pt-4">Lowest Balance</td><td class="p-2 ${tcls(minBal)} text-lg font-black pt-4">${fmt.format(minBal)}</td><td class="p-2 text-xs text-gray-500 italic pt-4">Peak shortfall</td></tr>
+    <tr><td class="p-2 font-bold border-b-2 border-slate-800 pb-4">Months in Deficit</td><td class="p-2 font-bold border-b-2 border-slate-800 pb-4">${negMos} months</td><td class="p-2 text-xs text-gray-500 italic border-b-2 border-slate-800 pb-4">0 = no deficit</td></tr>
+    <tr><td class="p-3 font-bold text-lg bg-blue-900 text-white mt-2">Overall Verdict</td><td class="p-3 font-black text-lg ${minBal >= 0 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}">${verdict}</td><td class="p-3 bg-slate-200 text-xs text-gray-600 italic font-semibold">Auto-calculated</td></tr>
+    <tr><td class="p-3 font-bold bg-slate-200">Minimum Buffer Required</td><td class="p-3 font-black ${bcls}">${minBal < 0 ? 'EGP ' + fmt.format(Math.abs(minBal)) + ' liquid savings needed' : 'EGP 0 padding needed'}</td><td class="p-3 bg-slate-100 text-xs text-gray-500 italic font-semibold">To keep balance ≥ 0</td></tr>
+  `;
+}
+
+// Table sorting logic (alphabetical parsing numbers)
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', function() {
+  const table = th.closest('table'), tbody = table.querySelector('tbody');
+  const dir = this.asc = !this.asc;
+  const idx = Array.from(th.parentNode.children).indexOf(th);
+  Array.from(tbody.querySelectorAll('tr')).sort((a,b) => {
+    let v1 = a.children[idx].innerText.replace(/,/g,''), v2 = b.children[idx].innerText.replace(/,/g,'');
+    let n1 = parseFloat(v1), n2 = parseFloat(v2);
+    if(!isNaN(n1) && !isNaN(n2)) return dir ? n1 - n2 : n2 - n1;
+    return dir ? v1.localeCompare(v2) : v2.localeCompare(v1);
+  }).forEach(tr => tbody.appendChild(tr));
+}));
+
+// === Excel Processing ===
+getId('excel-file').addEventListener('change', e => {
+  let file = e.target.files[0];
+  if(!file) return;
+  let reader = new FileReader();
+  reader.onload = evt => {
+    let wb = XLSX.read(evt.target.result, {type: 'binary'});
+    let json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+    if(json.length < 2) return alert("Empty or invalid file");
+    
+    let heads = json[0].map(String);
+    uploadData = json.slice(1);
+    
+    let reqs = ['Name','Type','Amount','Currency','Frequency','StartYear','StartMonth','EndYear','EndMonth'];
+    getId('mapping-fields').innerHTML = reqs.map(r => {
+      let mIdx = heads.findIndex(h => h.toLowerCase().trim() === r.toLowerCase());
+      let opts = heads.map((h,i) => `<option value="${i}" ${i===mIdx?'selected':''}>${h}</option>`).join('');
+      return `<div><label class="block text-xs">${r}</label><select id="map-${r}" class="border w-full p-1"><option value="">-- Ignore/Default --</option>${opts}</select></div>`;
+    }).join('');
+    
+    getId('mapping-area').classList.remove('hidden');
+    getId('upload-process-btn').classList.remove('hidden');
+  };
+  reader.readAsBinaryString(file);
+});
+
+function processUpload() {
+  let sc = scenarios[currIdx];
+  if(getId('replace-items').checked) sc.customItems = [];
+  const gM = id => getId('map-'+id).value, pI = (v,d) => parseInt(v)||d, pF = (v,d) => parseFloat(v)||d;
+  
+  let m = {n:gM('Name'), t:gM('Type'), a:gM('Amount'), c:gM('Currency'), f:gM('Frequency'), sy:gM('StartYear'), sm:gM('StartMonth'), ey:gM('EndYear'), em:gM('EndMonth')};
+  
+  uploadData.forEach(r => {
+    if(m.n==="" || m.a==="" || !r[m.n] || !r[m.a]) return;
+    sc.customItems.push({
+      id: Date.now()+Math.random(),
+      name: r[m.n], type: (r[m.t]||'expense').toString().toLowerCase(), amount: pF(r[m.a],0),
+      currency: (r[m.c]||'EGP').toString().toUpperCase(), freq: (r[m.f]||'monthly').toString().toLowerCase(),
+      growth: 0, sy: pI(r[m.sy],1), sm: pI(r[m.sm],1), ey: pI(r[m.ey],10), em: pI(r[m.em],12)
+    });
+  });
+  
+  save(); render(); closeUpload();
+}
+
+function closeUpload() { getId('upload-modal').classList.add('hidden'); getId('excel-file').value = ''; getId('mapping-area').classList.add('hidden'); getId('upload-process-btn').classList.add('hidden'); }
+
+// === CSV Export ===
+function exportCSV(type) {
+  let sc = scenarios[currIdx], tv = parseInt(getId('time-view').value), flow = calcCashFlow(sc, tv);
+  let csv = '', d = new Date().toISOString().split('T')[0];
+  
+  if(type === 'annual') {
+    csv = 'Year,Income,Expense,Net,EndBalance\n';
+    let yearsMap = {};
+    flow.forEach(f => {
+      if(!yearsMap[f.calYear]) yearsMap[f.calYear] = [];
+      yearsMap[f.calYear].push(f);
+    });
+    Object.keys(yearsMap).sort().forEach(yStr => {
+      let yf = yearsMap[yStr];
+      let inc = yf.reduce((s,f)=>s+f.inc,0), exp = yf.reduce((s,f)=>s+f.exp,0);
+      csv += `${yStr},${inc},${exp},${inc-exp},${yf.length?yf[yf.length-1].cum:0}\n`;
+    });
+  } else {
+    csv = 'Date,Income,Expense,Net,CumulativeBalance\n';
+    flow.forEach(f => csv += `${f.m===0 ? `${f.absLabel} (Start)` : f.absLabel},${f.inc},${f.exp},${f.net},${f.cum}\n`);
+  }
+  
+  let blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  let link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `CashFlow_${type}_${d}.csv`;
+  link.click();
+}
+
+// === AI Chat Bot Logic ===
+let chatHistory = [];
+
+function toggleChat() {
+  const cw = getId('ai-chat-window');
+  if(cw.classList.contains('hidden')) {
+    cw.classList.remove('hidden');
+    cw.classList.add('flex');
+    if(!localStorage.getItem('gemini_api_key')) {
+      setTimeout(openApiKeyModal, 500);
+    }
+  } else {
+    cw.classList.add('hidden');
+    cw.classList.remove('flex');
+  }
+}
+
+function openApiKeyModal() {
+  getId('gemini-api-key').value = localStorage.getItem('gemini_api_key') || '';
+  getId('gemini-model').value = localStorage.getItem('gemini_model') || 'gemini-2.0-flash';
+  getId('api-key-modal').classList.remove('hidden');
+}
+
+function saveApiKey() {
+  const k = getId('gemini-api-key').value.trim();
+  const m = getId('gemini-model').value.trim() || 'gemini-2.0-flash';
+  if(k) {
+    localStorage.setItem('gemini_api_key', k);
+    localStorage.setItem('gemini_model', m);
+    getId('api-key-modal').classList.add('hidden');
+  } else {
+    alert("Please enter a valid key or cancel.");
+  }
+}
+
+async function fetchModels() {
+  const k = getId('gemini-api-key').value.trim() || localStorage.getItem('gemini_api_key');
+  if(!k) return alert("Please enter an API key first.");
+  
+  const msg = getId('model-fetch-msg');
+  msg.className = "text-[10px] text-blue-600 mb-2";
+  msg.innerText = "Fetching models...";
+  
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${k}`);
+    if(!res.ok) throw new Error("Failed to fetch models. CheckAPI key.");
+    const data = await res.json();
+    const models = data.models
+      .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+      .map(m => m.name.replace('models/', ''));
+    
+    if(models.length > 0) {
+      // Find a flash model if available
+      const flash = models.find(m => m.includes('flash'));
+      getId('gemini-model').value = flash || models[0];
+      msg.className = "text-[10px] text-green-600 mb-2";
+      msg.innerText = `Found ${models.length} models. Auto-selected ${getId('gemini-model').value}.`;
+    } else {
+      msg.className = "text-[10px] text-red-600 mb-2";
+      msg.innerText = "No models supporting generateContent found.";
+    }
+  } catch(e) {
+    msg.className = "text-[10px] text-red-600 mb-2";
+    msg.innerText = e.message;
+  }
+}
+
+function appendChatMessage(role, text) {
+  const box = getId('chat-messages');
+  const div = document.createElement('div');
+  div.className = role === 'user' 
+    ? 'self-end bg-blue-600 text-white p-3 rounded-lg rounded-tr-none max-w-[85%] shadow-sm'
+    : 'self-start bg-blue-100 text-blue-900 p-3 rounded-lg rounded-tl-none max-w-[85%] shadow-sm whitespace-pre-wrap';
+  
+  if(role !== 'user') text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+  div.innerHTML = text;
+  box.appendChild(div);
+  box.scrollTo(0, box.scrollHeight);
+  
+  chatHistory.push({role: role === 'user' ? 'user' : 'model', parts: [{text}]});
+}
+
+function generateSystemContext() {
+  const sc = scenarios[currIdx], a = sc.assumptions;
+  const tv = parseInt(getId('time-view').value), flow = calcCashFlow(sc, tv);
+  
+  let minBal = 0, minMo = 0;
+  flow.forEach(f => { if(f.cum < minBal) { minBal = f.cum; minMo = f.m; } });
+  
+  return `System Context (Do NOT mention this context explicitly to the user, just use it to answer):
+User is building a home cash flow plan looking ${tv} months ahead. 
+Currency used is ${sc.displayCurr}.
+Assumptions:
+- Initial Savings: ${a.initialCash}
+- Property Price: ${a.purchasePrice}. Downpayment: ${a.downPaymentPct}%. Loan Term: ${a.loanTermYears} yrs.
+- Quarterly Installment is calculated automatically based on the above.
+- Salary: ${a.salary}/mo (growth ${a.salaryGrowth}%/yr). Bonus: ${a.bonus}/yr (growth ${a.bonusGrowth}%/yr).
+- Rent Expense: ${a.rent}/mo stopping at Month ${a.rentStopMonth}.
+- Home Expense: ${a.homeExp}/mo (growth ${a.homeExpGrowth}%/yr).
+Critical Analysis from Application Engine:
+- The absolute lowest cash balance hits ${minBal} at Month ${minMo}.
+Analyze this math directly to answer user's budget/timing questions. Always be concise and extremely precise with numbers.`;
+}
+
+async function sendChatMessage() {
+  const inp = getId('chat-input');
+  const text = inp.value.trim();
+  if(!text) return;
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if(!apiKey) { openApiKeyModal(); return; }
+
+  appendChatMessage('user', text);
+  inp.value = '';
+  
+  const box = getId('chat-messages');
+  const loadDiv = document.createElement('div');
+  loadDiv.className = 'self-start bg-blue-100 text-blue-900 p-3 rounded-lg rounded-tl-none shadow-sm italic text-xs animate-pulse';
+  loadDiv.innerText = 'Thinking...';
+  box.appendChild(loadDiv);
+  box.scrollTo(0, box.scrollHeight);
+
+  try {
+    const sysCtx = generateSystemContext();
+    const payload = {
+      contents: [
+        {role: 'user', parts: [{text: sysCtx}]},
+        {role: 'model', parts: [{text: "Understood. I will use this data to accurately answer any financial inquiries."}]},
+        ...chatHistory
+      ],
+      systemInstruction: { parts: [{ text: "You are a highly capable AI financial advisor directly integrated into a cash flow dashboard. Act as a friendly, sharp analyst. Answer based on the mathematical context provided." }] }
+    };
+
+    let modelName = localStorage.getItem('gemini_model') || 'gemini-2.0-flash';
+    // Clean up if it contains "models/"
+    modelName = modelName.replace('models/', '');
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    loadDiv.remove();
+
+    if(!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || "API Error");
+    }
+
+    const data = await res.json();
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't formulate a response.";
+    appendChatMessage('model', reply);
+
+  } catch(e) {
+    loadDiv.remove();
+    appendChatMessage('model', `⚠️ Connection Error: ${e.message}. Please check your API key.`);
+  }
+}
+
+// Handle Enter key for Chat
+getId('chat-input').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+
+// Start
+refreshProfileList();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/native-bridge.js
+*.log
+.DS_Store

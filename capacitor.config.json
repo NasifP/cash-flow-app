@@ -1,0 +1,8 @@
+{
+  "appId": "com.antigravity.cashflow",
+  "appName": "Cash Flow Manager",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
