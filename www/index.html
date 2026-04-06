@@ -97,8 +97,6 @@
   <!-- Header -->
   <header style="padding-top: calc(0.75rem + var(--safe-top))" class="bg-blue-800 text-white px-3 pb-3 flex flex-wrap justify-between items-center z-10 sticky top-0 shadow shrink-0 gap-2">
     <div class="flex items-center gap-2">
-      <button onclick="document.getElementById('sidebar').classList.toggle('hidden');" class="md:hidden px-2 border rounded">☰</button>
-      <button onclick="toggleBottomSheet()" class="md:hidden bg-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-400 premium-shadow">Edit</button>
       <h1 class="text-lg font-bold tracking-tight">Cash Flow <span class="text-blue-300">Manager</span></h1>
     </div>
     <div class="flex items-center gap-3 text-xs md:text-sm flex-wrap">
@@ -120,48 +118,6 @@
   </header>
 
   <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="w-full md:w-80 bg-white p-6 overflow-y-auto border-r shrink-0 hidden md:block text-sm transition-all" oninput="saveInputs()">
-      <div class="flex items-center justify-between mb-6">
-        <h2 class="font-black text-xl tracking-tight text-slate-800">Assumptions</h2>
-      </div>
-      
-      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Current Assets (EGP) <span class="text-xs opacity-50">↓</span></summary>
-        <div class="p-3 space-y-3 bg-blue-50/30 rounded-b-2xl -mt-2 border-x border-b border-blue-100">
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Initial Cash / Savings</label><input data-model="initialCash" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all premium-shadow"></div>
-        </div>
-      </details>
-
-      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200">Apartment Details <span class="text-xs opacity-50">↓</span></summary>
-        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Purchase Date</label><input data-model="purchaseDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Price (EGP)</label><input data-model="purchasePrice" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Down Payment %</label><input data-model="downPaymentPct" oninput="saveInputs()" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Upfront Fees % (Taxes/Agent)</label><input data-model="upfrontFees" oninput="saveInputs()" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Interest Rate % (Annual)</label><input data-model="loanInterest" oninput="saveInputs()" type="number" min="0" step="0.1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Term (Years)</label><input data-model="loanTermYears" oninput="saveInputs()" type="number" min="1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-        </div>
-      </details>
-
-      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Income (EGP) <span class="text-xs opacity-50">↓</span></summary>
-        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Salary</label><input data-model="salary" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Salary Growth %/yr</label><input data-model="salaryGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Annual Bonus (March)</label><input data-model="bonus" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Bonus Growth %/yr</label><input data-model="bonusGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Income (Monthly)</label><input data-model="otherIncome" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Inc. Growth %/yr</label><input data-model="otherIncomeGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-        </div>
-      </details>
-
-      <details class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Expenses (EGP/mo) <span class="text-xs opacity-50">↓</span></summary>
-        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent</label><input data-model="rent" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Growth %/yr</label><input data-model="rentGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Stop Date</label><input data-model="rentStopDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
-          <div class="grid grid-cols-2 gap-2">
-            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Home Exp</label><input data-model="homeExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
-            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Home Gr%</label><input data-model="homeExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alex Exp</label><input data-model="alexExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
@@ -293,7 +249,7 @@
       </div> <!-- end view-dashboard -->
       
       <!-- Assumptions View -->
-      <div id="view-assumptions" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div id="view-assumptions" class="hidden space-y-6 max-w-4xl mx-auto" oninput="saveInputs()">
         <div class="bg-blue-600 text-white p-6 rounded-3xl premium-shadow mb-8 relative overflow-hidden">
              <div class="relative z-10">
                 <h2 class="text-2xl font-black mb-2">Financial Assumptions</h2>
@@ -303,7 +259,69 @@
         </div>
         
         <div id="full-page-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <!-- Cloned from sidebar -->
+             <div class="bg-white p-6 rounded-3xl premium-shadow border border-slate-100 h-fit">
+                <h3 class="font-black text-slate-800 text-lg mb-4 uppercase tracking-tighter">Current Assets (EGP)</h3>
+                <div class="space-y-4">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Initial Cash / Savings</label><input data-model="initialCash" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all premium-shadow"></div>
+                </div>
+             </div>
+
+             <div class="bg-white p-6 rounded-3xl premium-shadow border border-slate-100 h-fit">
+                <h3 class="font-black text-slate-800 text-lg mb-4 uppercase tracking-tighter">Apartment Details</h3>
+                <div class="grid grid-cols-1 gap-4">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Purchase Month</label><input data-model="purchaseDate" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Property Price (EGP)</label><input data-model="purchasePrice" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Down Payment %</label><input data-model="downPaymentPct" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Upfront Fees %</label><input data-model="upfrontFees" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Interest Rate % (Annual)</label><input data-model="loanInterest" type="number" min="0" step="0.1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Term (Years)</label><input data-model="loanTermYears" type="number" min="1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                </div>
+             </div>
+
+             <div class="bg-white p-6 rounded-3xl premium-shadow border border-slate-100 h-fit">
+                <h3 class="font-black text-slate-800 text-lg mb-4 uppercase tracking-tighter">Income (EGP)</h3>
+                <div class="space-y-4">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Salary</label><input data-model="salary" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Salary Growth %/yr</label><input data-model="salaryGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Annual Bonus (March)</label><input data-model="bonus" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Bonus Growth %/yr</label><input data-model="bonusGrowth" type="number" min="0" step="0.1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Income</label><input data-model="otherIncome" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Income Growth %</label><input data-model="otherIncomeGrowth" type="number" min="0" step="0.1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                </div>
+             </div>
+
+             <div class="bg-white p-6 rounded-3xl premium-shadow border border-slate-100 h-fit">
+                <h3 class="font-black text-slate-800 text-lg mb-4 uppercase tracking-tighter">Recurring Expenses (EGP)</h3>
+                <div class="space-y-4">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Rent</label><input data-model="rent" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Growth %/yr</label><input data-model="rentGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Stop Date</label><input data-model="rentStopDate" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div class="border-t pt-4"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Home/Utils</label><input data-model="homeExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Home Growth %</label><input data-model="homeExpGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div class="border-t pt-4"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alex Monthly</label><input data-model="alexExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alex Growth %</label><input data-model="alexExpGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Verena Monthly</label><input data-model="verenaExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Verena Growth %</label><input data-model="verenaExpGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Emad Monthly</label><input data-model="emadExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Emad Growth %</label><input data-model="emadExpGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Personal Spending</label><input data-model="personalExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Personal Growth %</label><input data-model="personalExpGrowth" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                </div>
+             </div>
+
+             <div class="bg-white p-6 rounded-3xl premium-shadow border border-slate-100 h-fit">
+                <h3 class="font-black text-slate-800 text-lg mb-4 uppercase tracking-tighter">Education & Nursery</h3>
+                <div class="space-y-4">
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Nursery</label><input data-model="nurseryExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nursery Start</label><input data-model="nurseryStartDate" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nursery Stop</label><input data-model="nurseryStopDate" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div class="border-t pt-4"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Annual School Fees</label><input data-model="schoolExp" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                  <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">School Fees Month</label><input data-model="schoolStartDate" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+                </div>
+             </div>
         </div>
 
         <!-- Custom Items Page Section -->
@@ -486,19 +504,20 @@
   </div>
 </div>
 
-<!-- Mobile Bottom Sheet -->
-<div id="mobile-bottom-sheet" class="fixed inset-0 z-50 pointer-events-none md:hidden">
-  <div id="sheet-overlay" class="absolute inset-0 bg-black/20 opacity-0 transition-opacity pointer-events-auto" onclick="toggleBottomSheet()"></div>
-  <div style="padding-bottom: calc(1.5rem + var(--safe-bottom))" class="absolute bottom-0 left-0 right-0 glass rounded-t-[32px] p-6 premium-shadow pointer-events-auto transform translate-y-full flex flex-col max-h-[90vh]">
-    <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 shrink-0"></div>
-    <div class="flex justify-between items-center mb-6 shrink-0 px-2">
-      <h2 class="text-xl font-black text-slate-800">Edit Assumptions</h2>
-      <button onclick="toggleBottomSheet()" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full font-bold">×</button>
-    </div>
-    <div id="mobile-inputs-container" class="flex-1 overflow-y-auto px-2 pb-8 space-y-6 hide-scrollbar">
-      <!-- Cloned inputs will go here -->
-    </div>
-  </div>
+<!-- Mobile Support View Toggle -->
+<div id="mobile-nav" class="fixed bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around items-center z-40 md:hidden pb-[calc(1rem+var(--safe-bottom))]">
+    <button onclick="switchTab('dashboard')" class="flex flex-col items-center gap-1 group">
+        <span class="text-xl group-hover:scale-110">🏠</span>
+        <span class="text-[10px] font-bold uppercase">Home</span>
+    </button>
+    <button onclick="switchTab('assumptions')" class="flex flex-col items-center gap-1 group">
+        <span class="text-xl group-hover:scale-110">📝</span>
+        <span class="text-[10px] font-bold uppercase">Edit</span>
+    </button>
+    <button onclick="switchTab('report')" class="flex flex-col items-center gap-1 group">
+        <span class="text-xl group-hover:scale-110">📊</span>
+        <span class="text-[10px] font-bold uppercase">Report</span>
+    </button>
 </div>
 
 <script>
@@ -1213,34 +1232,8 @@ function switchTab(t) {
       : "px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600 shrink-0";
     if (view) view.classList.toggle('hidden', tab !== t);
   });
-  
-  if(t === 'assumptions') setupAssumptionsPage();
   render();
-}
-
-function setupAssumptionsPage() {
-    const container = getId('full-page-inputs');
-    if (container.children.length > 0) return; // Only populate once
-    
-    const sidebar = getId('sidebar');
-    const sections = sidebar.querySelectorAll('details');
-    sections.forEach(sec => {
-        const clone = sec.cloneNode(true);
-        clone.classList.remove('mb-4');
-        clone.classList.add('bg-white', 'p-4', 'rounded-3xl', 'premium-shadow', 'border', 'border-slate-100');
-        clone.setAttribute('open', ''); // Always open on the dedicated page
-        
-        // Improve styling for full page
-        const summary = clone.querySelector('summary');
-        summary.className = "font-black text-slate-800 text-lg mb-4 flex justify-between items-center bg-transparent p-0 border-0 uppercase tracking-tighter";
-        summary.querySelector('span')?.remove(); // remove the arrow
-        
-        container.appendChild(clone);
-    });
-    
-    // Wire up inputs after cloning
-    container.addEventListener('input', saveInputs);
-    loadUI(); // Refill values
+  document.getElementById('main-area')?.scrollTo(0,0);
 }
 
 // === Report Rendering ===
