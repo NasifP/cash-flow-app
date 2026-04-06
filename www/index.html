@@ -1125,7 +1125,12 @@ function render() {
   mTb.innerHTML = mT;
   
   populateReport(flow, tv, sc);
-    renderBreakdown(flow);
+  renderBreakdown(flow);
+  
+  // Refresh AI & Gauge
+  updateGoalGauge();
+  updateAIInsightsDebounced();
+  
   } catch (e) {
     console.error("Render Error:", e);
     const wb = getId('warning-banner');
