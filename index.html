@@ -2,14 +2,59 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Personal Cash Flow Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --accent: #f59e0b;
+    --bg-main: #f8fafc;
+    --glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  body { 
+    font-family: 'Outfit', sans-serif; 
+    background-color: var(--bg-main); 
+    overflow-x: hidden; 
+    user-select: none; /* Premium mobile feel */
+  }
   [v-cloak] { display: none; }
-  input:invalid { border-color: red; }
+  input:invalid { border-color: #ef4444; }
+  
+  /* Tactile Feedback */
+  .btn-premium {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-premium:active {
+    transform: scale(0.95);
+    filter: brightness(0.9);
+  }
+  
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+  
+  .premium-shadow {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Mobile Bottom Sheet Styles */
+  #mobile-bottom-sheet {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
@@ -50,10 +95,11 @@
 <!-- Main App -->
 <div id="app-screen" class="hidden flex-1 flex flex-col h-full overflow-hidden">
   <!-- Header -->
-  <header class="bg-blue-800 text-white p-3 flex flex-wrap justify-between items-center z-10 sticky top-0 shadow shrink-0 gap-2">
+  <header style="padding-top: calc(0.75rem + var(--safe-top))" class="bg-blue-800 text-white px-3 pb-3 flex flex-wrap justify-between items-center z-10 sticky top-0 shadow shrink-0 gap-2">
     <div class="flex items-center gap-2">
       <button onclick="document.getElementById('sidebar').classList.toggle('hidden');" class="md:hidden px-2 border rounded">☰</button>
-      <h1 class="text-lg font-bold">Cash Flow Manager</h1>
+      <button onclick="toggleBottomSheet()" class="md:hidden bg-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-400 premium-shadow">Edit</button>
+      <h1 class="text-lg font-bold tracking-tight">Cash Flow <span class="text-blue-300">Manager</span></h1>
     </div>
     <div class="flex items-center gap-3 text-xs md:text-sm flex-wrap">
       <label>Display: <select id="disp-curr" class="text-black p-1 rounded" onchange="updateDispCurr()"><option value="EGP">EGP</option><option value="USD">USD</option><option value="AED">AED</option></select></label>
@@ -75,56 +121,72 @@
 
   <div class="flex flex-1 overflow-hidden">
     <!-- Sidebar -->
-    <aside id="sidebar" class="w-full md:w-80 bg-white p-4 overflow-y-auto border-r shrink-0 hidden md:block text-sm" oninput="saveInputs()">
-      <h2 class="font-bold mb-3 text-lg">Assumptions</h2>
+    <aside id="sidebar" class="w-full md:w-80 bg-white p-6 overflow-y-auto border-r shrink-0 hidden md:block text-sm transition-all" oninput="saveInputs()">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="font-black text-xl tracking-tight text-slate-800">Assumptions</h2>
+      </div>
       
-      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-blue-50 text-blue-900 border border-blue-200 p-2 rounded">Current Assets (EGP)</summary>
-        <div class="p-2 space-y-2">
-          <div><label class="block text-xs font-semibold">Initial Cash / Savings</label><input data-model="initialCash" type="number" min="0" class="border border-blue-300 w-full p-2 rounded bg-white"></div>
+      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Current Assets (EGP) <span class="text-xs opacity-50">↓</span></summary>
+        <div class="p-3 space-y-3 bg-blue-50/30 rounded-b-2xl -mt-2 border-x border-b border-blue-100">
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Initial Cash / Savings</label><input data-model="initialCash" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all premium-shadow"></div>
         </div>
       </details>
 
-      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Apartment Details</summary>
-        <div class="p-2 space-y-2">
-          <div><label class="block text-xs font-semibold">Purchase Date</label><input data-model="purchaseDate" type="month" class="border border-blue-300 w-full p-2 rounded bg-white"></div>
-          <div><label class="block text-xs">Price (EGP)</label><input data-model="purchasePrice" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Down Payment %</label><input data-model="downPaymentPct" type="number" min="0" max="100" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Loan Term (Years)</label><input data-model="loanTermYears" type="number" min="1" class="border w-full p-1 rounded"></div>
+      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200">Apartment Details <span class="text-xs opacity-50">↓</span></summary>
+        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Purchase Date</label><input data-model="purchaseDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Price (EGP)</label><input data-model="purchasePrice" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Down Payment %</label><input data-model="downPaymentPct" oninput="saveInputs()" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Upfront Fees % (Taxes/Agent)</label><input data-model="upfrontFees" oninput="saveInputs()" type="number" min="0" max="100" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Interest Rate % (Annual)</label><input data-model="loanInterest" oninput="saveInputs()" type="number" min="0" step="0.1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Loan Term (Years)</label><input data-model="loanTermYears" oninput="saveInputs()" type="number" min="1" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
         </div>
       </details>
 
-      <details open class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Income (EGP)</summary>
-        <div class="p-2 space-y-2">
-          <div><label class="block text-xs">Monthly Salary</label><input data-model="salary" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Salary Growth %/yr</label><input data-model="salaryGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Annual Bonus (Mar from Y2)</label><input data-model="bonus" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Bonus Growth %/yr</label><input data-model="bonusGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Other Income (Monthly)</label><input data-model="otherIncome" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Other Income Growth %/yr</label><input data-model="otherIncomeGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
+      <details open class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Income (EGP) <span class="text-xs opacity-50">↓</span></summary>
+        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monthly Salary</label><input data-model="salary" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Salary Growth %/yr</label><input data-model="salaryGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Annual Bonus (March)</label><input data-model="bonus" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Bonus Growth %/yr</label><input data-model="bonusGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Income (Monthly)</label><input data-model="otherIncome" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Other Inc. Growth %/yr</label><input data-model="otherIncomeGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
         </div>
       </details>
 
-      <details class="mb-3"><summary class="font-bold cursor-pointer bg-slate-100 p-2 rounded">Expenses (EGP/mo)</summary>
-        <div class="p-2 space-y-2">
-          <div><label class="block text-xs">Rent</label><input data-model="rent" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Rent Growth %/yr</label><input data-model="rentGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Rent Stop Month</label><input data-model="rentStopMonth" type="number" min="1" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Home</label><input data-model="homeExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Home Growth %/yr</label><input data-model="homeExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Alex</label><input data-model="alexExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Alex Growth %/yr</label><input data-model="alexExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Verena</label><input data-model="verenaExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Verena Growth %/yr</label><input data-model="verenaExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Emad</label><input data-model="emadExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Emad Growth %/yr</label><input data-model="emadExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Personal</label><input data-model="personalExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Personal Growth %/yr</label><input data-model="personalExpGrowth" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div><label class="block text-xs">Nursery</label><input data-model="nurseryExp" type="number" min="0" class="border w-full p-1 rounded"></div>
-          <div class="flex gap-2">
-             <div class="w-1/2"><label class="block text-xs">Nursery Start(M)</label><input data-model="nurseryStartMonth" type="number" min="1" class="border w-full p-1 rounded"></div>
-             <div class="w-1/2"><label class="block text-xs">School Start(Y)</label><input data-model="schoolStartYear" type="number" min="1" class="border w-full p-1 rounded"></div>
+      <details class="mb-4 group"><summary class="font-bold cursor-pointer bg-slate-50 p-3 rounded-2xl flex justify-between items-center transition-all group-open:bg-slate-800 group-open:text-white border border-slate-200 uppercase tracking-tighter text-[10px]">Expenses (EGP/mo) <span class="text-xs opacity-50">↓</span></summary>
+        <div class="p-3 space-y-3 bg-slate-50/30 rounded-b-2xl -mt-2 border-x border-b border-slate-200">
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent</label><input data-model="rent" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Growth %/yr</label><input data-model="rentGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Rent Stop Date</label><input data-model="rentStopDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"></div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Home Exp</label><input data-model="homeExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Home Gr%</label><input data-model="homeExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
           </div>
-          <div><label class="block text-xs">School (Annual from Jan)</label><input data-model="schoolExp" type="number" min="0" class="border w-full p-1 rounded"></div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alex Exp</label><input data-model="alexExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alex Gr%</label><input data-model="alexExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Verena Exp</label><input data-model="verenaExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Verena Gr%</label><input data-model="verenaExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Emad Exp</label><input data-model="emadExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Emad Gr%</label><input data-model="emadExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+             <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Personal Exp</label><input data-model="personalExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+             <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Personal Gr%</label><input data-model="personalExpGrowth" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+          </div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nursery Exp (Monthly)</label><input data-model="nurseryExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+
+          <div class="flex gap-2">
+             <div class="w-1/2"><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nursery Start</label><input data-model="nurseryStartDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+             <div class="w-1/2"><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nursery Stop</label><input data-model="nurseryStopDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
+          </div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">School (Annual) - Start Month</label><input data-model="schoolStartDate" oninput="saveInputs()" type="month" class="border border-slate-200 w-full p-3 rounded-2xl bg-white mb-2"></div>
+          <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">School Fees (Annual - Jan)</label><input data-model="schoolExp" oninput="saveInputs()" type="number" min="0" class="border border-slate-200 w-full p-3 rounded-2xl bg-white"></div>
         </div>
       </details>
 
@@ -138,18 +200,53 @@
     <!-- Main Content -->
     <main class="flex-1 p-4 overflow-y-auto bg-slate-50 relative" id="main-area">
       <!-- Tabs -->
-      <div class="flex gap-4 mb-4 border-b pb-2 sticky -top-4 bg-slate-50 z-20 -mx-4 px-4 pt-4 shadow-sm">
-        <button id="tab-dashboard" class="px-4 py-2 border-b-2 border-blue-600 font-bold text-blue-600 bg-white shadow-sm" onclick="switchTab('dashboard')">Dashboard</button>
-        <button id="tab-report" class="px-4 py-2 text-gray-500 font-semibold hover:text-blue-600 bg-white/50 hover:bg-white" onclick="switchTab('report')">Financial Analysis Report</button>
-        <button id="tab-breakdown" class="px-4 py-2 text-gray-500 font-semibold hover:text-blue-600 bg-white/50 hover:bg-white" onclick="switchTab('breakdown')">Expenses Breakdown</button>
+      <div class="flex gap-4 mb-6 sticky -top-4 bg-slate-50/80 backdrop-blur z-20 -mx-4 px-6 pt-4">
+        <button id="tab-dashboard" class="px-6 py-3 rounded-2xl font-bold transition-all" onclick="switchTab('dashboard')">Dashboard</button>
+        <button id="tab-report" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600" onclick="switchTab('report')">Detailed Report</button>
+        <button id="tab-breakdown" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600" onclick="switchTab('breakdown')">Expenses</button>
       </div>
 
       <div id="view-dashboard">
       <!-- Warning Banner -->
-      <div id="warning-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-4 rounded shadow text-sm"></div>
+      <div id="warning-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-xl premium-shadow text-sm animate-pulse"></div>
+
+      <!-- NEW: AI Insights & Goal Gauge Section -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- AI Insights Card -->
+        <div class="lg:col-span-2 glass rounded-3xl p-6 premium-shadow relative overflow-hidden group">
+          <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <span class="text-6xl">✨</span>
+          </div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xl">✨</span>
+            <h3 class="font-bold text-slate-800">AI Financial Insights</h3>
+            <span id="ai-loading" class="hidden ml-2 flex space-x-1">
+              <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></span>
+              <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+              <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+            </span>
+          </div>
+          <div id="ai-insights-content" class="space-y-3 text-sm text-slate-600">
+            <p class="italic opacity-50">Adjust your assumptions to see fresh AI insights...</p>
+          </div>
+        </div>
+
+        <!-- Goal Progress Gauge -->
+        <div class="glass rounded-3xl p-6 premium-shadow flex flex-col items-center justify-center relative overflow-hidden">
+          <h3 class="font-bold text-slate-800 mb-4 self-start text-sm uppercase tracking-wider opacity-70">Goal: House Down Payment</h3>
+          <div class="relative w-48 h-24 overflow-hidden">
+            <canvas id="goalGauge" class="w-full h-full"></canvas>
+            <div id="goal-pct" class="absolute inset-0 flex items-end justify-center pb-1 text-2xl font-black text-slate-800">0%</div>
+          </div>
+          <div class="mt-4 text-center">
+            <p id="goal-verdict" class="text-xs font-bold text-slate-500 uppercase tracking-tighter">Calculating Path...</p>
+            <p id="goal-subtext" class="text-[10px] text-slate-400 mt-1">Based on current savings trend</p>
+          </div>
+        </div>
+      </div>
 
       <!-- Financial Analysis KPI Dashboard -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4" id="kpi-dashboard"></div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="kpi-dashboard"></div>
 
       <!-- Controls & Chart -->
       <div class="bg-white p-4 shadow rounded mb-4">
@@ -263,10 +360,8 @@
       <div class="col-span-2"><label class="block text-xs">Amount</label><input id="ci-amount" min="0" class="border w-full p-2" type="number"></div>
       <div><label class="block text-xs">Frequency</label><select id="ci-freq" class="border w-full p-2"><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="one-time">One-time</option></select></div>
       <div><label class="block text-xs">Growth Rate %/yr</label><input id="ci-growth" class="border w-full p-2" type="number" value="0"></div>
-      <div><label class="block text-xs">Start Year</label><input id="ci-start-y" min="1" class="border w-full p-2" type="number" value="1"></div>
-      <div><label class="block text-xs">Start Month (1-12)</label><input id="ci-start-m" min="1" max="12" class="border w-full p-2" type="number" value="1"></div>
-      <div><label class="block text-xs">End Year</label><input id="ci-end-y" min="1" class="border w-full p-2" type="number" value="10"></div>
-      <div><label class="block text-xs">End Month (1-12)</label><input id="ci-end-m" min="1" max="12" class="border w-full p-2" type="number" value="12"></div>
+      <div class="col-span-2"><label class="block text-xs">Start Date</label><input id="ci-start-date" class="border w-full p-2" type="month"></div>
+      <div class="col-span-2"><label class="block text-xs">End Date</label><input id="ci-end-date" class="border w-full p-2" type="month"></div>
     </div>
     <div class="mt-6 flex justify-end gap-2">
       <button onclick="document.getElementById('custom-item-modal').classList.add('hidden')" class="px-4 py-2 bg-slate-200 rounded">Cancel</button>
@@ -365,21 +460,46 @@
   </div>
 </div>
 
+<!-- Mobile Bottom Sheet -->
+<div id="mobile-bottom-sheet" class="fixed inset-0 z-50 pointer-events-none md:hidden">
+  <div id="sheet-overlay" class="absolute inset-0 bg-black/20 opacity-0 transition-opacity pointer-events-auto" onclick="toggleBottomSheet()"></div>
+  <div style="padding-bottom: calc(1.5rem + var(--safe-bottom))" class="absolute bottom-0 left-0 right-0 glass rounded-t-[32px] p-6 premium-shadow pointer-events-auto transform translate-y-full flex flex-col max-h-[90vh]">
+    <div class="w-12 h-1.5 bg-slate-300 rounded-full mx-auto mb-6 shrink-0"></div>
+    <div class="flex justify-between items-center mb-6 shrink-0 px-2">
+      <h2 class="text-xl font-black text-slate-800">Edit Assumptions</h2>
+      <button onclick="toggleBottomSheet()" class="w-8 h-8 flex items-center justify-center bg-slate-100 rounded-full font-bold">×</button>
+    </div>
+    <div id="mobile-inputs-container" class="flex-1 overflow-y-auto px-2 pb-8 space-y-6 hide-scrollbar">
+      <!-- Cloned inputs will go here -->
+    </div>
+  </div>
+</div>
+
 <script>
 // === State & Defaults ===
 const DEFAULTS = {
   initialCash: 0,
   purchaseDate: '2026-04', purchasePrice: 13000000, downPaymentPct: 5, loanTermYears: 8,
+  loanInterest: 0, upfrontFees: 0,
   salary: 90000, salaryGrowth: 10, bonus: 1250000, bonusGrowth: 0,
   otherIncome: 0, otherIncomeGrowth: 0,
-  rent: 18000, rentGrowth: 10, rentStopMonth: 60, homeExp: 15000, homeExpGrowth: 20,
+  rent: 18000, rentGrowth: 10, rentStopDate: '2031-04', homeExp: 15000, homeExpGrowth: 20,
   alexExp: 10000, alexExpGrowth: 0, verenaExp: 4000, verenaExpGrowth: 20,
-  emadExp: 17000, emadExpGrowth: 10, personalExp: 20000, personalExpGrowth: 10, nurseryExp: 10000, nurseryStartMonth: 12,
-  schoolExp: 200000, schoolStartYear: 4
+  emadExp: 17000, emadExpGrowth: 10, personalExp: 20000, personalExpGrowth: 10, 
+  nurseryExp: 10000, nurseryStartDate: '2027-04', nurseryStopDate: '2030-04',
+  schoolExp: 200000, schoolStartDate: '2030-05'
+};
+
+const diffMonths = (start, end) => {
+  if(!start || !end) return 0;
+  const [sy, sm] = start.split('-').map(Number);
+  const [ey, em] = end.split('-').map(Number);
+  return (ey - sy) * 12 + (em - sm);
 };
 
 let user = null, scenarios = [], currIdx = 0, chartInst = null, uploadData = [];
-const fmt = new Intl.NumberFormat('en-US');
+let aiTimeout = null;
+const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const v = id => parseFloat(document.getElementById(id).value) || 0;
 const getId = id => document.getElementById(id);
 
@@ -426,11 +546,85 @@ function login(savedUser) {
   let data = localStorage.getItem('cfm_' + user);
   if(data) { 
     scenarios = JSON.parse(data); 
-    scenarios.forEach(s => s.assumptions = Object.assign({}, DEFAULTS, s.assumptions));
+    scenarios.forEach(s => {
+      const a = s.assumptions;
+      // Migration: Convert legacy numeric offsets to ISO Date strings
+      const pd = a.purchaseDate || '2026-04';
+      if(a.rentStopMonth && !a.rentStopDate) {
+        let d = new Date(parseInt(pd.split('-')[0]), parseInt(pd.split('-')[1]) - 1 + a.rentStopMonth);
+        a.rentStopDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      }
+      if(a.nurseryStartMonth && !a.nurseryStartDate) {
+        let d = new Date(parseInt(pd.split('-')[0]), parseInt(pd.split('-')[1]) - 1 + a.nurseryStartMonth);
+        a.nurseryStartDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      }
+      if(a.schoolStartYear && !a.schoolStartDate) {
+        let d = new Date(parseInt(pd.split('-')[0]), parseInt(pd.split('-')[1]) - 1 + (a.schoolStartYear-1)*12 + 4); // Guessing May
+        a.schoolStartDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      }
+      if(!a.nurseryStopDate && a.schoolStartDate) {
+        let d = new Date(parseInt(a.schoolStartDate.split('-')[0]), parseInt(a.schoolStartDate.split('-')[1]) - 2);
+        a.nurseryStopDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      }
+      s.assumptions = Object.assign({}, DEFAULTS, a);
+    });
   }
   else { scenarios = [createScenario('Current Plan')]; save(); }
   currIdx = Math.min(currIdx, Math.max(0, scenarios.length - 1));
   loadUI();
+  setupMobileInputs(); // Initialize mobile inputs
+}
+
+function setupMobileInputs() {
+  const sidebar = getId('sidebar');
+  const container = getId('mobile-inputs-container');
+  container.innerHTML = '';
+  
+  // Clone everything inside sidebar except the title
+  const content = sidebar.cloneNode(true);
+  content.id = 'mobile-inputs-cloned';
+  content.classList.remove('md:w-80', 'bg-white', 'p-6', 'border-r', 'hidden', 'md:block');
+  content.classList.add('p-0', 'space-y-6');
+  
+  // Remove the "Assumptions" title for the mobile sheet
+  const title = content.querySelector('h2');
+  if(title) title.remove();
+
+  // Remove duplicate IDs from the clone to prevent selector confusion
+  content.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+
+  container.appendChild(content);
+  
+  // Syncing is handled by delegating to the original global functions 
+  // because the buttons in the clone call the same global onclick handlers.
+  // We just need to sync the input values.
+  container.addEventListener('input', (e) => {
+    const model = e.target.getAttribute('data-model');
+    if (model) {
+      const original = sidebar.querySelector(`[data-model="${model}"]`);
+      if (original) {
+        original.value = e.target.value;
+        saveInputs();
+      }
+    }
+  });
+}
+
+function toggleBottomSheet() {
+  const sheet = getId('mobile-bottom-sheet');
+  const overlay = getId('sheet-overlay');
+  const content = sheet.querySelector('.transform');
+  
+  if (content.classList.contains('translate-y-full')) {
+    setupMobileInputs(); // Ensure UI is fresh when opening
+    sheet.classList.remove('pointer-events-none');
+    overlay.classList.remove('opacity-0');
+    content.classList.remove('translate-y-full');
+  } else {
+    overlay.classList.add('opacity-0');
+    content.classList.add('translate-y-full');
+    setTimeout(() => sheet.classList.add('pointer-events-none'), 400);
+  }
 }
 
 function logout() {
@@ -455,6 +649,12 @@ function clearAllProfiles() {
 function save() {
   if(user) localStorage.setItem('cfm_' + user, JSON.stringify(scenarios));
 }
+
+// Global Auto-Save Persistence
+window.addEventListener('beforeunload', save);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') save();
+});
 
 function createScenario(name) {
   return { id: Date.now(), name, displayCurr: 'EGP', rates: { USD: 50, AED: 13.6 }, assumptions: {...DEFAULTS}, customItems: [] };
@@ -500,36 +700,24 @@ function loadUI() {
   getId('disp-curr').value = sc.displayCurr;
   getId('rate-usd').value = sc.rates.USD;
   getId('rate-aed').value = sc.rates.AED;
-  
-  // Populate inputs
-  document.querySelectorAll('[data-model]').forEach(el => {
-    let k = el.getAttribute('data-model');
-    if(sc.assumptions[k] !== undefined) el.value = sc.assumptions[k];
-  });
-  
+  getId('scenario-select').value = currIdx;
   render();
 }
 
 function saveInputs() {
   let sc = scenarios[currIdx];
-  document.querySelectorAll('[data-model]').forEach(el => {
-    let k = el.getAttribute('data-model');
-    if(el.type === 'number') {
-      let v = Number(el.value);
+  getId('sidebar').querySelectorAll('[data-model]').forEach(el => {
+    const k = el.getAttribute('data-model');
+    if(el.type === 'number' || el.type === 'range') {
+      let cleanVal = el.value.toString().replace(/,/g, '');
+      let v = parseFloat(cleanVal);
       sc.assumptions[k] = isNaN(v) ? 0 : v;
+    } else {
+      sc.assumptions[k] = el.value;
     }
-    else if(el.type === 'checkbox') sc.assumptions[k] = el.checked;
-    else sc.assumptions[k] = el.value;
   });
-  
-  // Hard fallback for Initial Cash explicitly
-  let icEl = document.querySelector('input[data-model="initialCash"]');
-  if(icEl && icEl.value) {
-     let v = Number(icEl.value);
-     sc.assumptions['initialCash'] = isNaN(v) ? 0 : v;
-  }
-
-  save(); render();
+  save(); 
+  render();
 }
 
 function updateDispCurr() { scenarios[currIdx].displayCurr = getId('disp-curr').value; save(); render(); }
@@ -565,33 +753,56 @@ function renderCustomItems() {
 function openCustomModal(i) {
   editCiId = i;
   const sc = scenarios[currIdx];
+  const a = sc.assumptions;
+  const pd = a.purchaseDate || '2026-04';
+  const [py, pm] = pd.split('-').map(Number);
+  
   getId('ci-modal-title').innerText = i < 0 ? "New Custom Item" : "Edit Custom Item";
   let ci = i >= 0 ? sc.customItems[i] : { name:'', type:'expense', currency:'EGP', amount:'', freq:'monthly', growth:0, sy:1, sm:1, ey:10, em:12 };
   
   getId('ci-name').value = ci.name; getId('ci-type').value = ci.type;
   getId('ci-currency').value = ci.currency; getId('ci-amount').value = ci.amount;
   getId('ci-freq').value = ci.freq; getId('ci-growth').value = ci.growth;
-  getId('ci-start-y').value = ci.sy; getId('ci-start-m').value = ci.sm;
-  getId('ci-end-y').value = ci.ey; getId('ci-end-m').value = ci.em;
+  
+  // Convert relative to absolute
+  const d1 = new Date(py, pm - 1 + (ci.sy-1)*12 + (ci.sm-1));
+  const d2 = new Date(py, pm - 1 + (ci.ey-1)*12 + (ci.em-1));
+  getId('ci-start-date').value = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}`;
+  getId('ci-end-date').value = `${d2.getFullYear()}-${String(d2.getMonth()+1).padStart(2,'0')}`;
   
   getId('custom-item-modal').classList.remove('hidden');
 }
 
 function saveCustomItem() {
-  const sy = v('ci-start-y'), sm = v('ci-start-m'), ey = v('ci-end-y'), em = v('ci-end-m');
-  if(sy*12 + sm > ey*12 + em) return alert("Start date must be before end date");
+  const sc = scenarios[currIdx];
+  const a = sc.assumptions;
+  const pd = a.purchaseDate || '2026-04';
+  const startD = getId('ci-start-date').value, endD = getId('ci-end-date').value;
+  
+  if(!startD || !endD) return alert("Please select both dates");
+  if(startD > endD) return alert("Start date must be before end date");
   if(v('ci-amount') < 0) return alert("Amount must be positive");
+
+  // Calculate relative offsets
+  const diffStart = diffMonths(pd, startD);
+  const diffEnd = diffMonths(pd, endD);
+  
+  // engine uses 1-based months/years
+  const sy = Math.floor(diffStart / 12) + 1;
+  const sm = (diffStart % 12) + 1;
+  const ey = Math.floor(diffEnd / 12) + 1;
+  const em = (diffEnd % 12) + 1;
   
   let ci = {
-    id: editCiId < 0 ? Date.now() : scenarios[currIdx].customItems[editCiId].id,
+    id: editCiId < 0 ? Date.now() : sc.customItems[editCiId].id,
     name: getId('ci-name').value || 'Item', type: getId('ci-type').value,
     currency: getId('ci-currency').value, amount: v('ci-amount'),
     freq: getId('ci-freq').value, growth: v('ci-growth'),
     sy, sm, ey, em
   };
   
-  if(editCiId < 0) scenarios[currIdx].customItems.push(ci);
-  else scenarios[currIdx].customItems[editCiId] = ci;
+  if(editCiId < 0) sc.customItems.push(ci);
+  else sc.customItems[editCiId] = ci;
   
   save(); render();
   getId('custom-item-modal').classList.add('hidden');
@@ -609,56 +820,119 @@ function calcCashFlow(sc, months) {
   const a = sc.assumptions;
   let flow = [], cum = 0, dC = sc.displayCurr;
   
-  let dp = a.purchasePrice * (a.downPaymentPct / 100);
-  let inst = (a.purchasePrice - dp) / (a.loanTermYears * 4);
-  let loanMs = a.loanTermYears * 12;
+  // 1. Apartment Math
+  const dp = a.purchasePrice * (a.downPaymentPct / 100);
+  const fees = a.purchasePrice * (a.upfrontFees / 100);
+  const principal = a.purchasePrice - dp;
   
+  // PMT Amortization (Monthly)
+  let monthlyInst = 0;
+  if (a.loanTermYears > 0) {
+    if (a.loanInterest > 0) {
+      const r = (a.loanInterest / 100) / 12;
+      const n = a.loanTermYears * 12;
+      monthlyInst = (principal * r) / (1 - Math.pow(1 + r, -n));
+    } else {
+      monthlyInst = principal / (a.loanTermYears * 12);
+    }
+  }
+  const quarterlyInst = monthlyInst * 3;
+  const loanMs = a.loanTermYears * 12;
+  
+  // 2. Timeline Helpers
   let startYYYYMM = String(a.purchaseDate || '2026-04');
   if(!startYYYYMM.includes('-')) startYYYYMM = '2026-04';
   let purYear = parseInt(startYYYYMM.split('-')[0], 10);
   let purMonth = parseInt(startYYYYMM.split('-')[1], 10);
   const mNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
   const getAbs = m => {
     let d = new Date(purYear, purMonth - 1 + (m - 1));
-    if(m === 0) d = new Date(purYear, purMonth - 2);
-    return { calYear: d.getFullYear(), calMonth: mNames[d.getMonth()], label: `${mNames[d.getMonth()]} ${d.getFullYear()}` };
+    return { 
+      calYear: d.getFullYear(), 
+      calMonth: mNames[d.getMonth()], 
+      label: `${mNames[d.getMonth()]} ${d.getFullYear()}` 
+    };
   };
-  
-  let abs0 = getAbs(0);
-  let initial = a.initialCash || 0;
-  flow.push({ m:0, y:0, miny:0, calYear:abs0.calYear, calMonth:abs0.calMonth, absLabel:abs0.label, inc:cvt(initial,'EGP',dC), exp:cvt(dp,'EGP',dC), net:cvt(initial-dp,'EGP',dC), cum:cvt(initial-dp,'EGP',dC) });
-  cum = initial - dp; // Keep internal cum in EGP
 
+  // 3. Growth Helper (Monthly Compounding)
+  const g = (annualRate, m) => Math.pow(1 + (annualRate || 0)/100, (m-1)/12);
+
+  // Month 0: Starting Snapshot (No flow)
+  let initial = a.initialCash || 0;
+  let abs0 = getAbs(0);
+  flow.push({ 
+    m:0, y:0, miny:0, calYear:abs0.calYear, calMonth:abs0.calMonth, absLabel:abs0.label + " (Start)", 
+    inc:cvt(initial,'EGP',dC), exp:0, net:cvt(initial,'EGP',dC), cum:cvt(initial,'EGP',dC),
+    breakdown: { 'Housing':0, 'Living':0, 'Education':0, 'Apartment':0, 'Custom':0 }
+  });
+  cum = initial;
+
+  // Months 1 to TotalMonths
   for(let m=1; m<=months; m++) {
     let y = Math.ceil(m/12), miny = m - (y-1)*12;
     let abs = getAbs(m);
     let inE=0, exE=0;
+    let brk = { 'Housing':0, 'Living':0, 'Education':0, 'Apartment':0, 'Custom':0 };
     
-    // Core
-    inE += a.salary * Math.pow(1 + (a.salaryGrowth||0)/100, y-1);
-    inE += (a.otherIncome||0) * Math.pow(1 + (a.otherIncomeGrowth||0)/100, y-1);
+    // Core Income
+    inE += a.salary * g(a.salaryGrowth, m);
+    inE += (a.otherIncome||0) * g(a.otherIncomeGrowth, m);
     
-    // Bonus absolute tracking
-    if(abs.calMonth === 'Mar' && abs.calYear > purYear) {
-      inE += (a.bonus||0) * Math.pow(1 + (a.bonusGrowth||0)/100, abs.calYear - purYear - 1);
+    // Annual Bonus (Check if month is March)
+    if(abs.calMonth === 'Mar') {
+      const yearsSinceStart = Math.max(0, abs.calYear - purYear);
+      inE += (a.bonus||0) * Math.pow(1 + (a.bonusGrowth||0)/100, yearsSinceStart);
     }
     
-    if(m <= a.rentStopMonth) exE += a.rent * Math.pow(1 + (a.rentGrowth||0)/100, y-1);
-    exE += a.homeExp * Math.pow(1 + a.homeExpGrowth/100, y-1);
-    exE += a.alexExp * Math.pow(1 + a.alexExpGrowth/100, y-1);
-    exE += a.verenaExp * Math.pow(1 + a.verenaExpGrowth/100, y-1);
-    exE += (a.emadExp * Math.pow(1 + (a.emadExpGrowth||0)/100, y-1)) + (a.personalExp * Math.pow(1 + (a.personalExpGrowth||0)/100, y-1));
-    
-    if(m >= a.nurseryStartMonth && m <= (a.schoolStartYear-1)*12) exE += a.nurseryExp;
-    
-    // School absolute tracking
-    if(y >= a.schoolStartYear && abs.calMonth === 'Jan') {
-       exE += a.schoolExp;
+    // Core Expenses
+    // 1. Rent
+    const mRentStop = 1 + diffMonths(startYYYYMM, a.rentStopDate || startYYYYMM);
+    if(m <= mRentStop) {
+      let val = a.rent * g(a.rentGrowth, m);
+      exE += val; brk['Housing'] += val;
     }
     
-    if(m%3 === 0 && m <= loanMs) exE += inst;
+    // 2. Living
+    const livingCats = [
+      {k:'homeExp', g:'homeExpGrowth'}, {k:'alexExp', g:'alexExpGrowth'}, 
+      {k:'verenaExp', g:'verenaExpGrowth'}, {k:'emadExp', g:'emadExpGrowth'},
+      {k:'personalExp', g:'personalExpGrowth'}
+    ];
+    livingCats.forEach(c => {
+      let val = (a[c.k]||0) * g(a[c.g]||0, m);
+      exE += val; brk['Living'] += val;
+    });
     
-    // Custom
+    // 3. Education
+    const mNurStart = 1 + diffMonths(startYYYYMM, a.nurseryStartDate || startYYYYMM);
+    const mNurStop = 1 + diffMonths(startYYYYMM, a.nurseryStopDate || startYYYYMM);
+    if(m >= mNurStart && m <= mNurStop) {
+      exE += a.nurseryExp; brk['Education'] += a.nurseryExp;
+    }
+    // Annual School Fees (Check if month matches schoolStartDate selection)
+    if (a.schoolStartDate) {
+      const schMonthName = mNames[parseInt(a.schoolStartDate.split('-')[1], 10) - 1];
+      if (abs.calMonth === schMonthName) {
+         const mSchStart = 1 + diffMonths(startYYYYMM, a.schoolStartDate);
+         if (m >= mSchStart) {
+           exE += a.schoolExp; brk['Education'] += a.schoolExp;
+         }
+      }
+    }
+    
+    // 4. Apartment
+    // House One-Time (Downpayment + Fees in Month 1)
+    if (m === 1) {
+      let val = dp + fees;
+      exE += val; brk['Apartment'] += val;
+    }
+    // Monthly/Quarterly Installments
+    if(m > 1 && m <= loanMs && (m-1)%3 === 0) {
+      exE += quarterlyInst; brk['Apartment'] += quarterlyInst;
+    }
+    
+    // 5. Custom Items
     for(let ci of sc.customItems) {
       let stM = (ci.sy-1)*12 + ci.sm, enM = (ci.ey-1)*12 + ci.em;
       if(m >= stM && m <= enM) {
@@ -668,19 +942,26 @@ function calcCashFlow(sc, months) {
         else if(ci.freq === 'one-time' && m === stM) act = true;
         
         if(act) {
-          let cY = Math.floor((m-stM)/12);
-          let amt = ci.amount * Math.pow(1 + ci.growth/100, cY);
+          let monthsElapsed = m - stM;
+          let amt = ci.amount * Math.pow(1 + ci.growth/100, monthsElapsed/12);
           let valE = cvt(amt, ci.currency, 'EGP');
-          if(ci.type === 'income') inE += valE; else exE += valE;
+          if(ci.type === 'income') inE += valE; 
+          else { exE += valE; brk['Custom'] += valE; }
         }
       }
     }
     
     cum += (inE - exE);
+    // Map breakdown to display currency
+    Object.keys(brk).forEach(k => brk[k] = Math.round(cvt(brk[k],'EGP',dC)));
+    
     flow.push({ 
       m, y, miny, calYear:abs.calYear, calMonth:abs.calMonth, absLabel:abs.label,
-      inc: cvt(inE,'EGP',dC), exp: cvt(exE,'EGP',dC), 
-      net: cvt(inE-exE,'EGP',dC), cum: cvt(cum,'EGP',dC) 
+      inc: Math.round(cvt(inE,'EGP',dC)), 
+      exp: Math.round(cvt(exE,'EGP',dC)), 
+      net: Math.round(cvt(inE-exE,'EGP',dC)), 
+      cum: Math.round(cvt(cum,'EGP',dC)),
+      breakdown: brk
     });
   }
   return flow;
@@ -688,11 +969,24 @@ function calcCashFlow(sc, months) {
 
 // === Rendering ===
 function render() {
-  renderCustomItems();
-  const sc = scenarios[currIdx];
-  const tv = parseInt(getId('time-view').value);
-  const flow = calcCashFlow(sc, tv);
-  const dC = sc.displayCurr;
+  try {
+    renderCustomItems();
+    updateGoalGauge(); 
+    updateAIInsightsDebounced(); 
+    const sc = scenarios[currIdx];
+    const tv = parseInt(getId('time-view').value);
+    const flow = calcCashFlow(sc, tv);
+    if (!flow || flow.length === 0) throw new Error("Calculation generated empty flow");
+    
+    // Safety check: ensure everything is a valid number before rendering tables
+    flow.forEach(f => {
+      if (isNaN(f.inc)) f.inc = 0;
+      if (isNaN(f.exp)) f.exp = 0;
+      if (isNaN(f.net)) f.net = 0;
+      if (isNaN(f.cum)) f.cum = 0;
+    });
+
+    const dC = sc.displayCurr;
   
   // Warning
   let minC = 0, minF = null, minL = null;
@@ -805,111 +1099,65 @@ function render() {
   mTb.innerHTML = mT;
   
   populateReport(flow, tv, sc);
-  renderBreakdown();
-}
-
-function renderBreakdown() {
-  const sc = scenarios[currIdx], a = sc.assumptions;
-  const rT = c => c==='USD'?sc.rates.USD : c==='AED'?sc.rates.AED : 1;
-  const cvt = (amt, from, to) => amt * rT(from) / rT(to);
-  const dC = sc.displayCurr;
-  
-  const cats = {
-    'Apartment Inst. & Down Pmt': { 1:0, 12:0, 60:0, 120:0 },
-    'Rent': { 1:0, 12:0, 60:0, 120:0 },
-    'Home Expenses': { 1:0, 12:0, 60:0, 120:0 },
-    'Alex Expenses': { 1:0, 12:0, 60:0, 120:0 },
-    'Verena Expenses': { 1:0, 12:0, 60:0, 120:0 },
-    'Emad Expenses': { 1:0, 12:0, 60:0, 120:0 },
-    'Personal Expenses': { 1:0, 12:0, 60:0, 120:0 },
-    'Nursery': { 1:0, 12:0, 60:0, 120:0 },
-    'School': { 1:0, 12:0, 60:0, 120:0 }
-  };
-  
-  let customExp = {};
-  
-  let dp = cvt(a.purchasePrice * (a.downPaymentPct / 100), 'EGP', dC);
-  cats['Apartment Inst. & Down Pmt'][1] += dp;
-  cats['Apartment Inst. & Down Pmt'][12] += dp;
-  cats['Apartment Inst. & Down Pmt'][60] += dp;
-  cats['Apartment Inst. & Down Pmt'][120] += dp;
-  
-  let instEGP = (a.purchasePrice - (a.purchasePrice * (a.downPaymentPct / 100))) / (a.loanTermYears * 4);
-  let loanMs = a.loanTermYears * 12;
-
-  for(let m=1; m<=120; m++) {
-    let y = Math.ceil(m/12), miny = m - (y-1)*12;
-    
-    let mexp = {
-      'Rent': m <= a.rentStopMonth ? cvt(a.rent * Math.pow(1 + (a.rentGrowth||0)/100, y-1), 'EGP', dC) : 0,
-      'Home Expenses': cvt(a.homeExp * Math.pow(1 + a.homeExpGrowth/100, y-1), 'EGP', dC),
-      'Alex Expenses': cvt(a.alexExp * Math.pow(1 + a.alexExpGrowth/100, y-1), 'EGP', dC),
-      'Verena Expenses': cvt(a.verenaExp * Math.pow(1 + a.verenaExpGrowth/100, y-1), 'EGP', dC),
-      'Emad Expenses': cvt(a.emadExp * Math.pow(1 + (a.emadExpGrowth||0)/100, y-1), 'EGP', dC),
-      'Personal Expenses': cvt(a.personalExp * Math.pow(1 + (a.personalExpGrowth||0)/100, y-1), 'EGP', dC),
-      'Nursery': (m >= a.nurseryStartMonth && m <= (a.schoolStartYear-1)*12) ? cvt(a.nurseryExp, 'EGP', dC) : 0,
-      'School': (y >= a.schoolStartYear && miny === 1) ? cvt(a.schoolExp, 'EGP', dC) : 0,
-      'Apartment Inst. & Down Pmt': (m%3 === 0 && m <= loanMs) ? cvt(instEGP, 'EGP', dC) : 0
-    };
-    
-    if(m <= 1) Object.keys(mexp).forEach(k => cats[k][1] += mexp[k]);
-    if(m <= 12) Object.keys(mexp).forEach(k => cats[k][12] += mexp[k]);
-    if(m <= 60) Object.keys(mexp).forEach(k => cats[k][60] += mexp[k]);
-    if(m <= 120) Object.keys(mexp).forEach(k => cats[k][120] += mexp[k]);
-    
-    for(let ci of sc.customItems) {
-      if(ci.type === 'expense') {
-        if(!customExp[ci.name]) customExp[ci.name] = {1:0, 12:0, 60:0, 120:0};
-        let stM = (ci.sy-1)*12 + ci.sm, enM = (ci.ey-1)*12 + ci.em;
-        if(m >= stM && m <= enM) {
-          let act = false;
-          if(ci.freq === 'monthly') act = true;
-          else if(ci.freq === 'annual' && (m-stM)%12 === 0) act = true;
-          else if(ci.freq === 'one-time' && m === stM) act = true;
-          
-          if(act) {
-            let cY = Math.floor((m-stM)/12);
-            let val = cvt(ci.amount * Math.pow(1 + ci.growth/100, cY), ci.currency, dC);
-            if(m <= 1) customExp[ci.name][1] += val;
-            if(m <= 12) customExp[ci.name][12] += val;
-            if(m <= 60) customExp[ci.name][60] += val;
-            if(m <= 120) customExp[ci.name][120] += val;
-          }
-        }
-      }
+    renderBreakdown(flow);
+  } catch (e) {
+    console.error("Render Error:", e);
+    const wb = getId('warning-banner');
+    if (wb) {
+      wb.classList.remove('hidden');
+      wb.innerHTML = `<b class="text-red-600">❌ Error in calculation:</b> ${e.message}. Please check your inputs.`;
     }
   }
+}
+
+function renderBreakdown(flow) {
+  const sc = scenarios[currIdx];
+  const dC = sc.displayCurr;
   
-  let allCats = {...cats, ...customExp};
-  let grandTotal10y = 0, grand1=0, grand12=0, grand60=0;
-  Object.values(allCats).forEach(v => { grandTotal10y+=v[120]; grand1+=v[1]; grand12+=v[12]; grand60+=v[60]; });
+  // Categorization from results
+  const categories = ['Apartment', 'Housing', 'Living', 'Education', 'Custom'];
+  const cats = {};
+  categories.forEach(c => cats[c] = { 1:0, 12:0, 60:0, 120:0 });
   
-  let tbody = '', keys = Object.keys(allCats).sort((a,b) => allCats[b][120] - allCats[a][120]);
-  
-  keys.forEach(k => {
-    let vals = allCats[k];
-    let ratio = grandTotal10y > 0 ? (vals[120]/grandTotal10y)*100 : 0;
-    if(vals[120] > 0) {
-      tbody += `<tr class="hover:bg-slate-50">
-        <td class="text-left font-semibold p-2 border-b">${k}</td>
-        <td class="p-2 border-b text-red-700">${fmt.format(vals[1])}</td>
-        <td class="p-2 border-b text-red-700">${fmt.format(vals[12])}</td>
-        <td class="p-2 border-b text-red-700">${fmt.format(vals[60])}</td>
-        <td class="p-2 border-b text-red-700 font-bold">${fmt.format(vals[120])}</td>
-        <td class="p-2 border-b text-blue-700 font-bold">${ratio.toFixed(1)}%</td>
-      </tr>`;
-    }
+  flow.forEach(f => {
+    if(f.m === 0) return;
+    categories.forEach(c => {
+      let val = f.breakdown[c] || 0;
+      if(f.m <= 1) cats[c][1] += val;
+      if(f.m <= 12) cats[c][12] += val;
+      if(f.m <= 60) cats[c][60] += val;
+      if(f.m <= 120) cats[c][120] += val;
+    });
   });
   
-  document.getElementById('breakdown-table').querySelector('tbody').innerHTML = tbody;
-  document.getElementById('breakdown-table').querySelector('tfoot').innerHTML = `<tr>
-    <td class="text-left p-2 uppercase tracking-wider text-[10px]">Grand Total</td>
-    <td class="p-2">${fmt.format(grand1)}</td>
-    <td class="p-2">${fmt.format(grand12)}</td>
-    <td class="p-2">${fmt.format(grand60)}</td>
-    <td class="p-2">${fmt.format(grandTotal10y)}</td>
-    <td class="p-2">100.0%</td>
-  </tr>`;
+  let total120 = flow.reduce((s,f) => s + (f.m > 0 && f.m <= 120 ? f.exp : 0), 0);
+  let total60 = flow.reduce((s,f) => s + (f.m > 0 && f.m <= 60 ? f.exp : 0), 0);
+  let total12 = flow.reduce((s,f) => s + (f.m > 0 && f.m <= 12 ? f.exp : 0), 0);
+  let total1 = flow.reduce((s,f) => s + (f.m > 0 && f.m <= 1 ? f.exp : 0), 0);
+
+  let tbody = '';
+  categories.forEach(c => {
+    let pct = total120 > 0 ? Math.round((cats[c][120] / total120) * 100) : 0;
+    tbody += `<tr class="hover:bg-slate-50">
+      <td class="text-left font-semibold p-2 border-b text-slate-800">${c}</td>
+      <td class="p-2 border-b text-red-700">${fmt.format(cats[c][1])}</td>
+      <td class="p-2 border-b text-red-700">${fmt.format(cats[c][12])}</td>
+      <td class="p-2 border-b text-red-700">${fmt.format(cats[c][60])}</td>
+      <td class="p-2 border-b text-red-700 font-bold">${fmt.format(cats[c][120])}</td>
+      <td class="p-2 border-b font-medium">${pct}%</td>
+    </tr>`;
+  });
+  
+  getId('breakdown-table').querySelector('tbody').innerHTML = tbody;
+  getId('breakdown-table').querySelector('tfoot').innerHTML = `
+    <tr class="bg-slate-100 font-bold border-t-2 border-slate-300">
+      <td class="p-2 text-left uppercase text-[9px] tracking-widest text-slate-500">Total Projected Outflow</td>
+      <td class="p-2 text-red-800">${fmt.format(total1)}</td>
+      <td class="p-2 text-red-800">${fmt.format(total12)}</td>
+      <td class="p-2 text-red-800">${fmt.format(total60)}</td>
+      <td class="p-2 text-red-800">${fmt.format(total120)}</td>
+      <td class="p-2">100%</td>
+    </tr>`;
 }
 
 // === Tab Logic ===
@@ -918,11 +1166,9 @@ function switchTab(tabId) {
     document.getElementById('view-'+t).classList.toggle('hidden', t !== tabId);
     let btn = document.getElementById('tab-'+t);
     if(t === tabId) {
-      btn.classList.add('border-b-2','border-blue-600','font-bold','text-blue-600','bg-white','shadow-sm');
-      btn.classList.remove('text-gray-500','font-semibold','bg-white/50');
+      btn.className = "px-6 py-3 rounded-2xl font-bold transition-all bg-blue-600 text-white premium-shadow";
     } else {
-      btn.classList.remove('border-b-2','border-blue-600','font-bold','text-blue-600','bg-white','shadow-sm');
-      btn.classList.add('text-gray-500','font-semibold','bg-white/50');
+      btn.className = "px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600";
     }
   });
   document.getElementById('main-area').scrollTo(0,0);
@@ -989,10 +1235,10 @@ function populateReport(flow, tv, sc) {
     <tr><td class="p-2 font-bold w-1/3">Purchase Price</td><td class="p-2 font-bold">${fmt.format(a.purchasePrice)}</td><td class="p-2 text-xs text-gray-500 italic">${fmt.format(a.purchasePrice)} EGP</td></tr>
     <tr><td class="p-2 font-bold">Plan Duration</td><td class="p-2 font-bold">${a.loanTermYears} years</td><td class="p-2 text-xs text-gray-500 italic">${a.loanTermYears} years</td></tr>
     <tr><td class="p-2 font-bold">Quarterly Installment</td><td class="p-2 font-bold">${fmt.format(Math.round(qInst))}</td><td class="p-2 text-xs text-gray-500 italic">Auto-calculated</td></tr>
-    <tr><td class="p-2 font-bold border-b border-slate-300">Rent Period</td><td class="p-2 border-b border-slate-300 font-bold">${Math.round(a.rentStopMonth/12)} years (Months 1-${a.rentStopMonth})</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Years 1-${Math.round(a.rentStopMonth/12)} inclusive</td></tr>
+    <tr><td class="p-2 font-bold border-b border-slate-300">Rent Period</td><td class="p-2 border-b border-slate-300 font-bold">${a.rentStopDate || 'N/A'}</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Expires end of ${a.rentStopDate}</td></tr>
     <tr><td class="p-2 font-bold">Home Exp Growth</td><td class="p-2 font-bold">${a.homeExpGrowth||0}%</td><td class="p-2 text-xs text-gray-500 italic">${a.homeExpGrowth||0}% per year</td></tr>
     <tr><td class="p-2 font-bold">Verena Exp Growth</td><td class="p-2 font-bold">${a.verenaExpGrowth||0}%</td><td class="p-2 text-xs text-gray-500 italic">${a.verenaExpGrowth||0}% per year</td></tr>
-    <tr><td class="p-2 font-bold border-b border-slate-300">Nursery Active Period</td><td class="p-2 border-b border-slate-300 font-bold">Month ${a.nurseryStartMonth} &rarr; Year ${a.schoolStartYear-1} end</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Stops year before school</td></tr>
+    <tr><td class="p-2 font-bold border-b border-slate-300">Nursery Active Period</td><td class="p-2 border-b border-slate-300 font-bold">${a.nurseryStartDate} &rarr; ${a.nurseryStopDate}</td><td class="p-2 border-b border-slate-300 text-xs text-gray-500 italic">Calendar bound</td></tr>
     <tr><td class="p-2 font-bold text-lg pt-4">Lowest Balance</td><td class="p-2 ${tcls(minBal)} text-lg font-black pt-4">${fmt.format(minBal)}</td><td class="p-2 text-xs text-gray-500 italic pt-4">Peak shortfall</td></tr>
     <tr><td class="p-2 font-bold border-b-2 border-slate-800 pb-4">Months in Deficit</td><td class="p-2 font-bold border-b-2 border-slate-800 pb-4">${negMos} months</td><td class="p-2 text-xs text-gray-500 italic border-b-2 border-slate-800 pb-4">0 = no deficit</td></tr>
     <tr><td class="p-3 font-bold text-lg bg-blue-900 text-white mt-2">Overall Verdict</td><td class="p-3 font-black text-lg ${minBal >= 0 ? 'bg-green-700 text-white' : 'bg-red-700 text-white'}">${verdict}</td><td class="p-3 bg-slate-200 text-xs text-gray-600 italic font-semibold">Auto-calculated</td></tr>
@@ -1193,6 +1439,98 @@ Assumptions:
 Critical Analysis from Application Engine:
 - The absolute lowest cash balance hits ${minBal} at Month ${minMo}.
 Analyze this math directly to answer user's budget/timing questions. Always be concise and extremely precise with numbers.`;
+}
+
+// === NEW: Goal Gauge & AI Insight Logic ===
+function updateGoalGauge() {
+  const sc = scenarios[currIdx], a = sc.assumptions;
+  const target = a.purchasePrice * (a.downPaymentPct / 100);
+  const current = a.initialCash || 0;
+  
+  // Calculate percentage (clamped 0-100)
+  const pct = Math.min(100, Math.max(0, target > 0 ? (current / target) * 100 : 0));
+  getId('goal-pct').innerText = Math.round(pct) + '%';
+  
+  const ctx = getId('goalGauge').getContext('2d');
+  const w = ctx.canvas.width = 192, h = ctx.canvas.height = 96;
+  ctx.clearRect(0, 0, w, h);
+  
+  // Draw Background Arch
+  ctx.beginPath();
+  ctx.arc(w/2, h, 80, Math.PI, 2 * Math.PI);
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.stroke();
+  
+  // Draw Progress Arch
+  const endAngle = Math.PI + (Math.PI * (pct/100));
+  ctx.beginPath();
+  ctx.arc(w/2, h, 80, Math.PI, endAngle);
+  ctx.lineWidth = 12;
+  ctx.lineCap = 'round';
+  
+  // Color based on status
+  let color = '#2563eb'; // blue
+  let verdict = "Saving up...";
+  if (pct >= 100) { color = '#10b981'; verdict = "Downpayment Ready! ✓"; }
+  else if (pct < 20) { color = '#f59e0b'; verdict = "Just Starting..."; }
+  
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  
+  getId('goal-verdict').innerText = verdict;
+  getId('goal-verdict').style.color = color;
+}
+
+function updateAIInsightsDebounced() {
+  if (aiTimeout) clearTimeout(aiTimeout);
+  aiTimeout = setTimeout(generateAIInsights, 2000);
+}
+
+async function generateAIInsights() {
+  const apiKey = localStorage.getItem('gemini_api_key');
+  if (!apiKey) return;
+  
+  getId('ai-loading').classList.remove('hidden');
+  
+  try {
+    const sysCtx = generateSystemContext();
+    const prompt = `Generate 3 HIGHLY CONCISE (max 12 words each) financial recommendations or observations based on the current data. Return ALWAYS as rounded WHOLE numbers (no decimals). Focus on the biggest expense, wealth building, or house feasibility. Return as a JSON array of strings ONLY. Example: ["Reducing rent by 10% speeds up house goal by 6 months", "Salary growth at 10% is your main wealth driver", "Personal expenses are 40% of your total budget"].`;
+    
+    const payload = {
+      contents: [{ role: 'user', parts: [{ text: sysCtx + "\n\n" + prompt }] }]
+    };
+    
+    let modelName = localStorage.getItem('gemini_model') || 'gemini-2.0-flash';
+    modelName = modelName.replace('models/', '');
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if(!res.ok) throw new Error("API Error");
+
+    const data = await res.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    
+    // Try to parse JSON from text (in case model wraps in markdown)
+    const jsonMatch = text.match(/\[.*\]/s);
+    const insights = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+    
+    const container = getId('ai-insights-content');
+    container.innerHTML = insights.map(ins => `
+      <div class="flex items-start gap-3 group">
+        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mt-1.5 shrink-0 group-hover:scale-150 transition-transform"></span>
+        <p class="group-hover:text-slate-900 transition-colors">${ins}</p>
+      </div>
+    `).join('');
+
+  } catch(e) {
+    console.warn("AI Insights failed:", e);
+  } finally {
+    getId('ai-loading').classList.add('hidden');
+  }
 }
 
 async function sendChatMessage() {
