@@ -190,9 +190,9 @@
         </div>
       </details>
 
-      <div class="mt-4 border-t pt-4">
+      <div class="mt-4 border-t pt-4" id="custom-items-container">
         <h3 class="font-bold mb-2">Custom Items</h3>
-        <div id="custom-items-list" class="flex flex-col gap-2 mb-3"></div>
+        <div class="custom-items-list flex flex-col gap-2 mb-3"></div>
         <button onclick="openCustomModal(-1)" class="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 py-2 rounded font-semibold text-xs">+ Add Custom Item</button>
       </div>
     </aside>
@@ -303,7 +303,18 @@
         </div>
         
         <div id="full-page-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <!-- Cloned from sidebar but styled for full-page -->
+             <!-- Cloned from sidebar -->
+        </div>
+
+        <!-- Custom Items Page Section -->
+        <div class="bg-white p-8 rounded-3xl premium-shadow border border-slate-100">
+             <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black text-slate-800">Special Custom Items</h3>
+                <button onclick="openCustomModal(-1)" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-all">+ Add New Item</button>
+             </div>
+             <div class="custom-items-list grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Data-driven list -->
+             </div>
         </div>
       </div>
 
@@ -762,22 +773,23 @@ function saveRates() {
 let editCiId = -1;
 function renderCustomItems() {
   const sc = scenarios[currIdx];
-  const list = getId('custom-items-list');
-  list.innerHTML = sc.customItems.map((ci, i) => `
-    <div class="flex justify-between items-center bg-slate-100 border p-2 rounded">
-      <div>
-        <div class="font-bold whitespace-nowrap overflow-hidden text-ellipsis w-24 md:w-32">${ci.name}</div>
-        <div class="${ci.type === 'income' ? 'text-green-600' : 'text-red-600'} text-xs">
-          ${fmt.format(ci.amount)} ${ci.currency} (${ci.freq})
+  const html = sc.customItems.map((ci, i) => `
+    <div class="flex justify-between items-center bg-white border border-slate-100 p-3 rounded-2xl premium-shadow group hover:border-blue-300 transition-all">
+      <div class="overflow-hidden">
+        <div class="font-black text-slate-800 truncate mb-1">${ci.name}</div>
+        <div class="${ci.type === 'income' ? 'text-green-600' : 'text-red-500'} font-bold text-sm">
+          ${fmt.format(ci.amount)} ${ci.currency} <span class="text-[10px] font-normal opacity-60">(${ci.freq})</span>
         </div>
-        <div class="text-[10px] text-gray-500">Y${ci.sy}M${ci.sm} to Y${ci.ey}M${ci.em}</div>
+        <div class="text-[10px] text-slate-400 font-medium mt-1">Y${ci.sy}M${ci.sm} to Y${ci.ey}M${ci.em}</div>
       </div>
-      <div class="flex flex-col gap-1">
-        <button onclick="openCustomModal(${i})" class="text-xs bg-white border px-2 py-1 rounded shadow-sm hover:bg-slate-50">Edit</button>
-        <button onclick="delCustomItem(${i})" class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded shadow-sm hover:bg-red-200">Del</button>
+      <div class="flex flex-col gap-2 ml-4">
+        <button onclick="openCustomModal(${i})" class="text-[10px] font-bold bg-slate-50 text-slate-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg transition-all">EDIT</button>
+        <button onclick="delCustomItem(${i})" class="text-[10px] font-bold bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg transition-all">DEL</button>
       </div>
     </div>
   `).join('');
+  
+  document.querySelectorAll('.custom-items-list').forEach(el => el.innerHTML = html);
 }
 
 function openCustomModal(i) {
