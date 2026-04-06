@@ -259,9 +259,8 @@
             </select>
           </label>
           <div class="flex gap-2">
-            <button onclick="document.getElementById('upload-modal').classList.remove('hidden');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded">📤 Excel Import</button>
-            <button onclick="exportCSV('annual')" class="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded">📥 CSV (Year)</button>
-            <button onclick="exportCSV('monthly')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded hidden md:block">📥 CSV (Month)</button>
+            <button onclick="document.getElementById('upload-modal').classList.remove('hidden');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded text-xs">📤 Excel Import</button>
+            <button onclick="exportToExcel()" class="bg-green-700 hover:bg-green-600 text-white px-4 py-1 rounded font-bold text-xs shadow-sm active:scale-95 transition-transform">📊 Export Full Model (.xlsx)</button>
           </div>
         </div>
         <div class="relative w-full h-[300px]">
@@ -1307,33 +1306,113 @@ function processUpload() {
 
 function closeUpload() { getId('upload-modal').classList.add('hidden'); getId('excel-file').value = ''; getId('mapping-area').classList.add('hidden'); getId('upload-process-btn').classList.add('hidden'); }
 
-// === CSV Export ===
-function exportCSV(type) {
-  let sc = scenarios[currIdx], tv = parseInt(getId('time-view').value), flow = calcCashFlow(sc, tv);
-  let csv = '', d = new Date().toISOString().split('T')[0];
+// === Professional Excel Export ===
+function exportToExcel() {
+  const sc = scenarios[currIdx], a = sc.assumptions;
+  const flow = calcCashFlow(sc, 120); // Always export full 10Y
+  const dC = sc.displayCurr;
+  const d = new Date().toISOString().split('T')[0];
   
-  if(type === 'annual') {
-    csv = 'Year,Income,Expense,Net,EndBalance\n';
-    let yearsMap = {};
-    flow.forEach(f => {
-      if(!yearsMap[f.calYear]) yearsMap[f.calYear] = [];
-      yearsMap[f.calYear].push(f);
-    });
-    Object.keys(yearsMap).sort().forEach(yStr => {
-      let yf = yearsMap[yStr];
-      let inc = yf.reduce((s,f)=>s+f.inc,0), exp = yf.reduce((s,f)=>s+f.exp,0);
-      csv += `${yStr},${inc},${exp},${inc-exp},${yf.length?yf[yf.length-1].cum:0}\n`;
-    });
-  } else {
-    csv = 'Date,Income,Expense,Net,CumulativeBalance\n';
-    flow.forEach(f => csv += `${f.m===0 ? `${f.absLabel} (Start)` : f.absLabel},${f.inc},${f.exp},${f.net},${f.cum}\n`);
-  }
-  
-  let blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
-  let link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `CashFlow_${type}_${d}.csv`;
-  link.click();
+  const wb = XLSX.utils.book_new();
+
+  // 1. Dashboard Summary Sheet
+  const dashData = [
+    ["CASH FLOW MANAGER - SUMMARY REPORT", ""],
+    ["Generated on:", d],
+    ["Profile:", user],
+    ["Scenario:", sc.name],
+    ["Display Currency:", dC],
+    [""],
+    ["KEY PERFORMANCE INDICATORS", "VALUE", "CURRENCY"],
+    ["Starting Cash", a.initialCash, "EGP"],
+    ["Total 10Y Income", flow.reduce((s,f)=>s+f.inc,0), dC],
+    ["Total 10Y Expense", flow.reduce((s,f)=>s+f.exp,0), dC],
+    ["Ending Net Balance", flow[flow.length-1].cum, dC],
+    ["Goal Progress (Downpayment)", (a.initialCash / (a.purchasePrice * a.downPaymentPct/100) * 100).toFixed(1) + "%", ""],
+    ["Lowest Cash Point", Math.min(...flow.map(f=>f.cum)), dC]
+  ];
+  const wsDash = XLSX.utils.aoa_to_sheet(dashData);
+
+  // 2. Monthly Detail Sheet
+  const monthlyData = [
+    ["Month", "Year", "Date", `Income (${dC})`, `Expense (${dC})`, `Net (${dC})`, `Cumulative Balance (${dC})`]
+  ];
+  flow.forEach(f => {
+    monthlyData.push([f.m, f.y, f.absLabel, f.inc, f.exp, f.net, f.cum]);
+  });
+  const wsMonthly = XLSX.utils.aoa_to_sheet(monthlyData);
+
+  // 3. Annual Summary Sheet
+  const annualData = [["Year", `Income (${dC})`, `Expense (${dC})`, `Annual Net (${dC})`, `Year-End Balance (${dC})`]];
+  let yearsMap = {};
+  flow.forEach(f => {
+    if(!yearsMap[f.calYear]) yearsMap[f.calYear] = [];
+    yearsMap[f.calYear].push(f);
+  });
+  Object.keys(yearsMap).sort().forEach(yStr => {
+    let yf = yearsMap[yStr];
+    let inc = yf.reduce((s,f)=>s+f.inc,0), exp = yf.reduce((s,f)=>s+f.exp,0);
+    annualData.push([yStr, inc, exp, inc-exp, yf[yf.length-1].cum]);
+  });
+  const wsAnnual = XLSX.utils.aoa_to_sheet(annualData);
+
+  // 4. Expenses Breakdown Sheet
+  const brkData = [["Category", "1 Month", "1 Year (12m)", "5 Years (60m)", "10 Years (120m)", "10Y % of Total"]];
+  const cats = ['Housing', 'Living', 'Education', 'Apartment', 'Custom'];
+  let total10Y = flow.reduce((s,f)=>s+f.exp, 0);
+
+  cats.forEach(c => {
+    let m1 = flow[1].breakdown[c] || 0;
+    let y1 = flow.filter(f=>f.m>=1 && f.m<=12).reduce((s,f)=>s+(f.breakdown[c]||0), 0);
+    let y5 = flow.filter(f=>f.m>=1 && f.m<=60).reduce((s,f)=>s+(f.breakdown[c]||0), 0);
+    let y10 = flow.filter(f=>f.m>=1 && f.m<=120).reduce((s,f)=>s+(f.breakdown[c]||0), 0);
+    let pct = total10Y > 0 ? (y10 / total10Y * 100).toFixed(1) + "%" : "0%";
+    brkData.push([c, m1, y1, y5, y10, pct]);
+  });
+  const wsBrk = XLSX.utils.aoa_to_sheet(brkData);
+
+  // 5. Assumptions Sheet (Inputs)
+  const assData = [
+    ["INPUT CATEGORY", "PARAMETER", "VALUE", "UNIT / NOTES"],
+    ["Property", "Purchase Price", a.purchasePrice, "EGP"],
+    ["Property", "Downpayment %", a.downPaymentPct, "%"],
+    ["Property", "Loan Term", a.loanTermYears, "Years"],
+    ["Property", "Loan Interest", a.loanInterest, "% Annual"],
+    ["Income", "Base Salary", a.salary, "Monthly"],
+    ["Income", "Salary Growth", a.salaryGrowth, "% Annual"],
+    ["Income", "Annual Bonus", a.bonus, "Annual"],
+    ["Expenses", "Monthly Rent", a.rent, "Monthly"],
+    ["Expenses", "Rent Stop Date", a.rentStopDate, "Target Month"],
+    ["Expenses", "Home Exp Growth", a.homeExpGrowth, "% Annual"],
+    ["Education", "Nursery Fee", a.nurseryExp, "Monthly"],
+    ["Education", "School Fee", a.schoolExp, "Annual"],
+    ["Education", "School Start Date", a.schoolStartDate, "Target Month"]
+  ];
+  const wsAss = XLSX.utils.aoa_to_sheet(assData);
+
+  // 6. Custom Items Sheet
+  const ciData = [["Name", "Type", "Amount", "Currency", "Frequency", "Growth %", "Start (Y-M)", "End (Y-M)"]];
+  sc.customItems.forEach(ci => {
+    ciData.push([ci.name, ci.type, ci.amount, ci.currency, ci.freq, ci.growth, `Y${ci.sy} M${ci.sm}`, `Y${ci.ey} M${ci.em}`]);
+  });
+  const wsCi = XLSX.utils.aoa_to_sheet(ciData);
+
+  // Styling (Simple column widths for usability)
+  const wscols = [ {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15} ];
+  wsDash['!cols'] = wscols;
+  wsMonthly['!cols'] = [{wch:10}, {wch:10}, {wch:20}, {wch:15}, {wch:15}, {wch:15}, {wch:20}];
+  wsAss['!cols'] = [{wch:20}, {wch:20}, {wch:20}, {wch:25}];
+
+  // Add sheets to workbook
+  XLSX.utils.book_append_sheet(wb, wsDash, "Summary");
+  XLSX.utils.book_append_sheet(wb, wsMonthly, "Monthly Projections");
+  XLSX.utils.book_append_sheet(wb, wsAnnual, "Annual Summary");
+  XLSX.utils.book_append_sheet(wb, wsBrk, "Expenses Breakdown");
+  XLSX.utils.book_append_sheet(wb, wsAss, "My Assumptions");
+  XLSX.utils.book_append_sheet(wb, wsCi, "Custom Items");
+
+  // Export
+  XLSX.writeFile(wb, `CashFlow_FullExport_${sc.name.replace(/\s+/g,'_')}_${d}.xlsx`);
 }
 
 // === AI Chat Bot Logic ===
