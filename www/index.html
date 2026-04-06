@@ -200,10 +200,11 @@
     <!-- Main Content -->
     <main class="flex-1 p-4 overflow-y-auto bg-slate-50 relative" id="main-area">
       <!-- Tabs -->
-      <div class="flex gap-4 mb-6 sticky -top-4 bg-slate-50/80 backdrop-blur z-20 -mx-4 px-6 pt-4">
-        <button id="tab-dashboard" class="px-6 py-3 rounded-2xl font-bold transition-all" onclick="switchTab('dashboard')">Dashboard</button>
-        <button id="tab-report" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600" onclick="switchTab('report')">Detailed Report</button>
-        <button id="tab-breakdown" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600" onclick="switchTab('breakdown')">Expenses</button>
+      <div class="flex gap-4 mb-6 sticky -top-4 bg-slate-50/80 backdrop-blur z-20 -mx-4 px-6 pt-4 overflow-x-auto hide-scrollbar">
+        <button id="tab-dashboard" class="px-6 py-3 rounded-2xl font-bold transition-all shrink-0" onclick="switchTab('dashboard')">Dashboard</button>
+        <button id="tab-assumptions" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600 shrink-0" onclick="switchTab('assumptions')">Edit Assumptions</button>
+        <button id="tab-report" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600 shrink-0" onclick="switchTab('report')">Detailed Report</button>
+        <button id="tab-breakdown" class="px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600 shrink-0" onclick="switchTab('breakdown')">Expenses</button>
       </div>
 
       <div id="view-dashboard">
@@ -290,6 +291,21 @@
         </div>
       </div>
       </div> <!-- end view-dashboard -->
+      
+      <!-- Assumptions View -->
+      <div id="view-assumptions" class="hidden space-y-6 max-w-4xl mx-auto">
+        <div class="bg-blue-600 text-white p-6 rounded-3xl premium-shadow mb-8 relative overflow-hidden">
+             <div class="relative z-10">
+                <h2 class="text-2xl font-black mb-2">Financial Assumptions</h2>
+                <p class="text-blue-100 text-sm opacity-80">All changes below are saved automatically to your profile.</p>
+             </div>
+             <div class="absolute -right-10 -bottom-10 text-9xl opacity-10">📝</div>
+        </div>
+        
+        <div id="full-page-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <!-- Cloned from sidebar but styled for full-page -->
+        </div>
+      </div>
 
       <div id="view-report" class="hidden space-y-6">
         <!-- Section A: Liquidity Analysis -->
@@ -693,27 +709,42 @@ function loadUI() {
   let sc = scenarios[currIdx];
   // Rebuild select
   const sel = getId('scenario-select');
-  sel.innerHTML = scenarios.map((s,i) => `<option value="${i}">${s.name}</option>`).join('');
-  sel.value = currIdx;
+  if(sel) {
+    sel.innerHTML = scenarios.map((s,i) => `<option value="${i}">${s.name}</option>`).join('');
+    sel.value = currIdx;
+  }
   
-  getId('disp-curr').value = sc.displayCurr;
-  getId('rate-usd').value = sc.rates.USD;
-  getId('rate-aed').value = sc.rates.AED;
-  getId('scenario-select').value = currIdx;
+  if(getId('disp-curr')) getId('disp-curr').value = sc.displayCurr;
+  if(getId('rate-usd')) getId('rate-usd').value = sc.rates.USD;
+  if(getId('rate-aed')) getId('rate-aed').value = sc.rates.AED;
+  
+  // CRITICAL FIX: Repopulate all input fields to avoid "vanishing numbers"
+  document.querySelectorAll('[data-model]').forEach(el => {
+    const k = el.getAttribute('data-model');
+    if (sc.assumptions[k] !== undefined) {
+      el.value = sc.assumptions[k];
+    }
+  });
+
   render();
 }
 
 function saveInputs() {
   let sc = scenarios[currIdx];
-  getId('sidebar').querySelectorAll('[data-model]').forEach(el => {
+  // We grab values from both sidebar and the assumptions page collectively
+  document.querySelectorAll('[data-model]').forEach(el => {
     const k = el.getAttribute('data-model');
+    let v;
     if(el.type === 'number' || el.type === 'range') {
-      let cleanVal = el.value.toString().replace(/,/g, '');
-      let v = parseFloat(cleanVal);
-      sc.assumptions[k] = isNaN(v) ? 0 : v;
+      v = parseFloat(el.value.toString().replace(/,/g, '')) || 0;
     } else {
-      sc.assumptions[k] = el.value;
+      v = el.value;
     }
+    sc.assumptions[k] = v;
+    
+    // Sync other matching inputs (e.g. if you change salary on page, update it in sidebar)
+    const matches = document.querySelectorAll(`[data-model="${k}"]`);
+    matches.forEach(m => { if(m !== el) m.value = el.value; });
   });
   save(); 
   render();
@@ -1160,17 +1191,44 @@ function renderBreakdown(flow) {
 }
 
 // === Tab Logic ===
-function switchTab(tabId) {
-  ['dashboard','report','breakdown'].forEach(t => {
-    document.getElementById('view-'+t).classList.toggle('hidden', t !== tabId);
-    let btn = document.getElementById('tab-'+t);
-    if(t === tabId) {
-      btn.className = "px-6 py-3 rounded-2xl font-bold transition-all bg-blue-600 text-white premium-shadow";
-    } else {
-      btn.className = "px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600";
-    }
+function switchTab(t) {
+  const tabs = ['dashboard', 'report', 'breakdown', 'assumptions'];
+  tabs.forEach(tab => {
+    const btn = getId('tab-' + tab);
+    const view = getId('view-' + tab);
+    if (btn) btn.className = tab === t 
+      ? "px-6 py-3 rounded-2xl font-bold transition-all bg-blue-600 text-white shadow-lg shadow-blue-200 shrink-0" 
+      : "px-6 py-3 rounded-2xl font-bold transition-all text-slate-400 hover:bg-white hover:text-blue-600 shrink-0";
+    if (view) view.classList.toggle('hidden', tab !== t);
   });
-  document.getElementById('main-area').scrollTo(0,0);
+  
+  if(t === 'assumptions') setupAssumptionsPage();
+  render();
+}
+
+function setupAssumptionsPage() {
+    const container = getId('full-page-inputs');
+    if (container.children.length > 0) return; // Only populate once
+    
+    const sidebar = getId('sidebar');
+    const sections = sidebar.querySelectorAll('details');
+    sections.forEach(sec => {
+        const clone = sec.cloneNode(true);
+        clone.classList.remove('mb-4');
+        clone.classList.add('bg-white', 'p-4', 'rounded-3xl', 'premium-shadow', 'border', 'border-slate-100');
+        clone.setAttribute('open', ''); // Always open on the dedicated page
+        
+        // Improve styling for full page
+        const summary = clone.querySelector('summary');
+        summary.className = "font-black text-slate-800 text-lg mb-4 flex justify-between items-center bg-transparent p-0 border-0 uppercase tracking-tighter";
+        summary.querySelector('span')?.remove(); // remove the arrow
+        
+        container.appendChild(clone);
+    });
+    
+    // Wire up inputs after cloning
+    container.addEventListener('input', saveInputs);
+    loadUI(); // Refill values
 }
 
 // === Report Rendering ===
