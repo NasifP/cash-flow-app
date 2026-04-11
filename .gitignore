@@ -5,3 +5,4 @@ android/local.properties
 android/native-bridge.js
 *.log
 .DS_Store
+QuickSplit/
